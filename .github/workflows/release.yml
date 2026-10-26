@@ -1,0 +1,40 @@
+# Pushing a v* tag tests, builds the Pi binaries, and publishes a GitHub release.
+# Asset names match `dpkg --print-architecture` so the README install command
+# can pick the right one: arm64 for 64-bit Raspberry Pi OS, armhf for 32-bit.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - run: go test ./...
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          LDFLAGS: -s -w -X main.version=${{ github.ref_name }}
+        run: |
+          mkdir dist
+          GOARCH=arm64 go build -trimpath -ldflags="$LDFLAGS" -o dist/pi-display-arm64 .
+          # GOARM=6 runs on every 32-bit Pi, from the Zero up.
+          GOARCH=arm GOARM=6 go build -trimpath -ldflags="$LDFLAGS" -o dist/pi-display-armhf .
+          cd dist && sha256sum pi-display-* > SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes

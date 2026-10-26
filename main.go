@@ -1,8 +1,12 @@
 // pi-display turns a Raspberry Pi into a full-screen slideshow of the images
-// and videos in a folder, either local or mirrored from an SMB share.
+// and videos in a folder, either local or mirrored from an SMB share or a
+// public Google Drive folder.
 //
 //	sudo pi-display setup   # one-time: pick the source, install the boot service
 //	pi-display run          # what the service runs
+//	pi-display on [2h]      # stay on outside the schedule for a while (0 cancels)
+//	sudo pi-display update  # install the latest release and restart
+//	pi-display version
 package main
 
 import (
@@ -27,8 +31,14 @@ func main() {
 		err = run(ctx)
 	case "setup":
 		err = setup(ctx)
+	case "on":
+		err = keepOn(wakePath, argAt(2))
+	case "update":
+		err = update(ctx)
+	case "version":
+		fmt.Println(version)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: pi-display <setup|run>")
+		fmt.Fprintln(os.Stderr, "usage: pi-display <setup|run|on [duration]|update|version>")
 		os.Exit(2)
 	}
 	if err != nil && !errors.Is(err, context.Canceled) {
@@ -43,7 +53,7 @@ func argAt(i int) string {
 	return ""
 }
 
-// run plays the configured folder forever. SMB sources are mirrored into a
+// run plays the configured folder forever. Remote sources are mirrored into a
 // local cache every 30s so playback starts at boot without waiting for the
 // network and keeps going through outages.
 func run(ctx context.Context) error {
@@ -53,7 +63,7 @@ func run(ctx context.Context) error {
 	}
 
 	dir := device.Source
-	if isSMB(device.Source) {
+	if isRemote(device.Source) {
 		dir = cacheDir
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err

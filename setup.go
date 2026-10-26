@@ -118,12 +118,18 @@ func serviceAccount() (*user.User, error) {
 }
 
 func askSource(ctx context.Context, in *bufio.Reader) (Device, error) {
-	source, err := ask(in, "Media folder (smb://host/share/path or /local/path): ")
+	source, err := ask(in, "Media folder (smb://host/share/path, a public Google Drive folder link, or /local/path): ")
 	if err != nil {
 		return Device{}, err
 	}
 	d := Device{Source: source}
 
+	if isDrive(source) {
+		if _, err := parseDriveFolder(source); err != nil {
+			return d, err
+		}
+		return d, checkRemote(ctx, d)
+	}
 	if !isSMB(source) {
 		if !filepath.IsAbs(source) {
 			return d, errors.New("local folder must be an absolute path")
@@ -151,18 +157,23 @@ func askSource(ctx context.Context, in *bufio.Reader) (Device, error) {
 		}
 		d.Password = string(password)
 	}
+	return d, checkRemote(ctx, d)
+}
 
+// checkRemote lists a remote source once so setup fails on a bad link or
+// password instead of the service failing quietly later.
+func checkRemote(ctx context.Context, d Device) error {
 	fmt.Println("Connecting...")
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	src, closeFn, err := connectSMB(ctx, d)
+	src, closeFn, err := connect(ctx, d)
 	if err != nil {
-		return d, fmt.Errorf("connect to %s: %w", source, err)
+		return fmt.Errorf("connect to %s: %w", d.Source, err)
 	}
 	defer closeFn()
 	entries, err := fs.ReadDir(src, ".")
 	if err != nil {
-		return d, fmt.Errorf("list %s: %w", source, err)
+		return fmt.Errorf("list %s: %w", d.Source, err)
 	}
 	count := 0
 	for _, e := range entries {
@@ -171,7 +182,7 @@ func askSource(ctx context.Context, in *bufio.Reader) (Device, error) {
 		}
 	}
 	fmt.Printf("Connected. Found %d images and videos.\n", count)
-	return d, nil
+	return nil
 }
 
 func ask(in *bufio.Reader, prompt string) (string, error) {
@@ -209,11 +220,21 @@ func installBinary() error {
 	if err != nil {
 		return err
 	}
+	return replaceBinary(data)
+}
+
+// replaceBinary writes a new executable next to binPath and renames it into
+// place. The rename is atomic and safe while the old binary is running.
+func replaceBinary(data []byte) error {
 	tmp := binPath + ".new"
 	if err := os.WriteFile(tmp, data, 0o755); err != nil {
 		return err
 	}
-	return os.Rename(tmp, binPath)
+	if err := os.Rename(tmp, binPath); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func runCmd(name string, args ...string) error {

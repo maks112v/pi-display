@@ -17,6 +17,9 @@ const (
 	devicePath = "/etc/pi-display/config.json"
 	cacheDir   = "/var/lib/pi-display/media"
 	socketPath = "/run/pi-display/mpv.sock"
+	// wakePath holds the time a `pi-display on` override ends. It lives in
+	// the state directory so an override survives a reboot mid-event.
+	wakePath = "/var/lib/pi-display/awake-until"
 
 	// showFile is the optional slideshow config inside the media folder.
 	showFile    = "display.toml"
@@ -26,7 +29,8 @@ const (
 // Device is the per-Pi config written by `pi-display setup`. The file is 0600
 // because it holds the SMB password.
 type Device struct {
-	// Source is smb://host/share[/path] or an absolute local folder.
+	// Source is smb://host/share[/path], a public Google Drive folder link, or
+	// an absolute local folder.
 	Source   string `json:"source"`
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
@@ -70,6 +74,38 @@ type Show struct {
 	Mute         bool           `toml:"mute"`
 	Fit          string         `toml:"fit"`
 	Durations    map[string]int `toml:"durations"` // per-image seconds, keyed by filename
+	Schedule     *Schedule      `toml:"schedule"`  // nil means always on
+}
+
+// Schedule is the daily window the screen is on, in the Pi's local time. An
+// off time earlier than the on time spans midnight.
+type Schedule struct {
+	On  clock `toml:"on"`
+	Off clock `toml:"off"`
+}
+
+// clock is a time of day in minutes after midnight, written "HH:MM".
+type clock int
+
+func (c *clock) UnmarshalText(text []byte) error {
+	t, err := time.Parse("15:04", string(text))
+	if err != nil {
+		return fmt.Errorf("%q is not a 24-hour HH:MM time", text)
+	}
+	*c = clock(t.Hour()*60 + t.Minute())
+	return nil
+}
+
+// awake reports whether the schedule has the screen on at t.
+func (s *Schedule) awake(t time.Time) bool {
+	if s == nil {
+		return true
+	}
+	now := clock(t.Hour()*60 + t.Minute())
+	if s.On < s.Off {
+		return s.On <= now && now < s.Off
+	}
+	return now >= s.On || now < s.Off
 }
 
 var defaultShow = Show{ImageSeconds: 10, Mute: true, Fit: "contain"}
@@ -95,6 +131,14 @@ func parseShow(data []byte) (Show, error) {
 	}
 	if s.Fit != "contain" && s.Fit != "cover" {
 		return defaultShow, fmt.Errorf(`fit must be "contain" or "cover", got %q`, s.Fit)
+	}
+	if s.Schedule != nil {
+		if !md.IsDefined("schedule", "on") || !md.IsDefined("schedule", "off") {
+			return defaultShow, errors.New("schedule needs both on and off")
+		}
+		if s.Schedule.On == s.Schedule.Off {
+			return defaultShow, errors.New("schedule on and off must differ")
+		}
 	}
 	return s, nil
 }

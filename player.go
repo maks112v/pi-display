@@ -174,11 +174,13 @@ func (m *mpv) drain() {
 	}
 }
 
-// play loops through dir forever. The folder and display.toml are re-read
-// before every file, so changes show up without restarting anything.
+// play loops through dir forever. The folder, display.toml, and any
+// `pi-display on` override are re-read before every file, so changes show up
+// without restarting anything.
 func play(ctx context.Context, m *mpv, dir string) error {
 	show := defaultShow
 	current := ""
+	screenOn := true
 	var lastProblem string
 	report := func(problem string) {
 		if problem != "" && problem != lastProblem {
@@ -205,11 +207,27 @@ func play(ctx context.Context, m *mpv, dir string) error {
 			return err
 		}
 
-		names, err := listMedia(dir)
-		if err != nil {
-			problem = fmt.Sprintf("read %s: %v", dir, err)
-		} else if len(names) == 0 {
-			problem = fmt.Sprintf("no images or videos in %s yet", dir)
+		// Outside the schedule the screen goes black, unless `pi-display on`
+		// is holding it on. The change lands at the next file boundary.
+		now := time.Now()
+		if on := show.Schedule.awake(now) || now.Before(awakeUntil(wakePath)); on != screenOn {
+			screenOn = on
+			if on {
+				log.Print("screen on")
+			} else {
+				log.Print("screen off until the schedule turns it back on")
+			}
+		}
+
+		var names []string
+		if screenOn {
+			var err error
+			names, err = listMedia(dir)
+			if err != nil {
+				problem = fmt.Sprintf("read %s: %v", dir, err)
+			} else if len(names) == 0 {
+				problem = fmt.Sprintf("no images or videos in %s yet", dir)
+			}
 		}
 		report(problem)
 

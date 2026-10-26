@@ -22,6 +22,18 @@ const syncInterval = 30 * time.Second
 
 func isSMB(source string) bool { return strings.HasPrefix(source, "smb://") }
 
+// isRemote reports whether source is mirrored into the cache rather than
+// played in place.
+func isRemote(source string) bool { return isSMB(source) || isDrive(source) }
+
+// connect opens a remote source as an fs.FS for mirror.
+func connect(ctx context.Context, d Device) (fs.FS, func(), error) {
+	if isDrive(d.Source) {
+		return connectDrive(ctx, d.Source)
+	}
+	return connectSMB(ctx, d)
+}
+
 type smbTarget struct {
 	addr  string // host:port to dial
 	share string // UNC share path, \\host\share
@@ -129,7 +141,7 @@ func syncLoop(ctx context.Context, d Device, dir string) {
 }
 
 func syncOnce(ctx context.Context, d Device, dir string) error {
-	src, closeFn, err := connectSMB(ctx, d)
+	src, closeFn, err := connect(ctx, d)
 	if err != nil {
 		return err
 	}
@@ -138,7 +150,7 @@ func syncOnce(ctx context.Context, d Device, dir string) error {
 }
 
 // mirror makes dst match the media files and display.toml at the top level
-// of src. Files are compared by size and mtime, downloaded to a hidden temp
+// of src (an SMB share or a public Drive folder). Files are compared by size and mtime, downloaded to a hidden temp
 // file, then renamed into place so the player never sees a partial file.
 func mirror(src fs.FS, dst string) error {
 	entries, err := fs.ReadDir(src, ".")
@@ -168,7 +180,7 @@ func mirror(src fs.FS, dst string) error {
 		}
 	}
 
-	// dst belongs to us, so anything not on the share (including leftover
+	// dst belongs to us, so anything not in the source (including leftover
 	// temp files from an interrupted download) gets removed.
 	locals, err := os.ReadDir(dst)
 	if err != nil {
