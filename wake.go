@@ -9,9 +9,28 @@ import (
 	"time"
 )
 
-// keepOn handles `pi-display on [duration]`: the screen stays on for that
-// long (default 1h) even outside the schedule. A duration of 0 cancels.
-func keepOn(path, arg string) error {
+// override is a `pi-display on` or `pi-display off` in effect: the screen is
+// held on (or off) until Until, whatever the schedule says.
+type override struct {
+	On    bool
+	Until time.Time
+}
+
+func (o override) active(now time.Time) bool { return now.Before(o.Until) }
+
+// screenOn reports whether the screen should be on at now: the override while
+// it lasts, otherwise the schedule.
+func (o override) screenOn(s *Schedule, now time.Time) bool {
+	if o.active(now) {
+		return o.On
+	}
+	return s.awake(now)
+}
+
+// setOverride handles `pi-display on|off [duration]`: the screen stays on or
+// off for that long (default 1h), whatever the schedule says. A duration of 0
+// cancels either.
+func setOverride(path string, on bool, arg string) error {
 	d := time.Hour
 	if arg != "" {
 		var err error
@@ -27,28 +46,33 @@ func keepOn(path, arg string) error {
 		return nil
 	}
 
+	state := "off"
+	if on {
+		state = "on"
+	}
 	until := time.Now().Add(d).Truncate(time.Second)
 	tmp := path + ".new"
-	if err := os.WriteFile(tmp, []byte(until.Format(time.RFC3339)+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(tmp, []byte(state+" "+until.Format(time.RFC3339)+"\n"), 0o644); err != nil {
 		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		return err
 	}
-	fmt.Printf("Screen on until %s, then back on schedule.\n", until.Format("Mon 15:04"))
+	fmt.Printf("Screen %s until %s, then back on schedule.\n", state, until.Format("Mon 15:04"))
 	return nil
 }
 
-// awakeUntil returns when the current override ends, or the zero time if
-// there is none. An unreadable file counts as no override.
-func awakeUntil(path string) time.Time {
+// readOverride returns the override saved at path, or the zero override
+// (never active) if there is none. An unreadable file counts as none.
+func readOverride(path string) override {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return time.Time{}
+		return override{}
 	}
-	until, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data)))
-	if err != nil {
-		return time.Time{}
+	state, at, _ := strings.Cut(strings.TrimSpace(string(data)), " ")
+	until, err := time.Parse(time.RFC3339, at)
+	if err != nil || (state != "on" && state != "off") {
+		return override{}
 	}
-	return until
+	return override{On: state == "on", Until: until}
 }

@@ -6,29 +6,32 @@ import (
 	"time"
 )
 
-func TestKeepOn(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "awake-until")
-	if !awakeUntil(path).IsZero() {
-		t.Fatal("expected no override before keepOn")
+func TestSetOverride(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "override")
+	if readOverride(path).active(time.Now()) {
+		t.Fatal("expected no override before setOverride")
 	}
 
-	if err := keepOn(path, "90m"); err != nil {
-		t.Fatal(err)
-	}
-	if left := time.Until(awakeUntil(path)); left < 89*time.Minute || left > 90*time.Minute {
-		t.Errorf("override ends in %v, want about 90m", left)
+	for _, on := range []bool{true, false} {
+		if err := setOverride(path, on, "90m"); err != nil {
+			t.Fatal(err)
+		}
+		o := readOverride(path)
+		if left := time.Until(o.Until); o.On != on || left < 89*time.Minute || left > 90*time.Minute {
+			t.Errorf("setOverride(on=%v): got %+v, want on=%v ending in about 90m", on, o, on)
+		}
 	}
 
-	if err := keepOn(path, "0"); err != nil {
+	if err := setOverride(path, true, "0"); err != nil {
 		t.Fatal(err)
 	}
-	if !awakeUntil(path).IsZero() {
+	if readOverride(path).active(time.Now()) {
 		t.Error("expected override cleared")
 	}
 
 	for _, bad := range []string{"soon", "-1h"} {
-		if err := keepOn(path, bad); err == nil {
-			t.Errorf("keepOn(%q): expected error", bad)
+		if err := setOverride(path, false, bad); err == nil {
+			t.Errorf("setOverride(%q): expected error", bad)
 		}
 	}
 }

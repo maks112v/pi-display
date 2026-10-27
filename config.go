@@ -21,9 +21,9 @@ const (
 	devicePath = "/etc/pi-display/config.json"
 	cacheDir   = "/var/lib/pi-display/media"
 	socketPath = "/run/pi-display/mpv.sock"
-	// wakePath holds the time a `pi-display on` override ends. It lives in
-	// the state directory so an override survives a reboot mid-event.
-	wakePath = "/var/lib/pi-display/awake-until"
+	// overridePath holds a `pi-display on` or `off` override and when it
+	// ends. It lives in the state directory so it survives a reboot.
+	overridePath = "/var/lib/pi-display/override"
 
 	// showFile is the optional slideshow config inside the media folder.
 	showFile    = "display.toml"

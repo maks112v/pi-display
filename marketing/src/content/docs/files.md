@@ -9,7 +9,7 @@ description: Where Pi Display keeps its program, settings, and media.
 | `/etc/pi-display/config.json` | Media folder, SMB login, and settings from setup. Readable only by the user the slideshow runs as. |
 | `/etc/systemd/system/pi-display.service` | The service that starts the slideshow at boot |
 | `/var/lib/pi-display/media` | The mirrored copy of an SMB or Drive folder |
-| `/var/lib/pi-display/awake-until` | When a `pi-display on` override ends |
+| `/var/lib/pi-display/override` | A `pi-display on` or `off` override and when it ends |
 | `/usr/share/plymouth/themes/pi-display` | The boot logo, on Pis with the boot splash |
 
 Setup also installs `mpv` with apt, and may switch the Pi to boot to the console instead of a desktop. [Uninstall](/docs/uninstall) covers undoing both.

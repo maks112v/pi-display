@@ -220,13 +220,14 @@ func (m *mpv) drain() {
 }
 
 // play loops through dir forever, with base as the settings display.toml is
-// layered over. The folder, display.toml, and any `pi-display on` override are
+// layered over. The folder, display.toml, and any `pi-display on|off` override are
 // re-read before every file, so changes show up without restarting anything.
 func play(ctx context.Context, m *mpv, dir string, base Show) error {
 	show := base
 	current := ""
 	order := newPlayOrder()
 	screenOn := true
+	var seen override // the last override read, to spot a new on or off command
 	var lastProblem string
 	report := func(problem string) {
 		if problem != "" && problem != lastProblem {
@@ -253,16 +254,26 @@ func play(ctx context.Context, m *mpv, dir string, base Show) error {
 			return err
 		}
 
-		// Outside the schedule the screen goes black, unless `pi-display on`
-		// is holding it on. With tv_power the TV is also put in standby over
-		// HDMI-CEC, and woken when the schedule comes back. The change lands
-		// at the next file boundary.
+		// Outside the schedule the screen goes black, and `pi-display on|off`
+		// overrides the schedule for a while. With tv_power the TV is also put
+		// in standby over HDMI-CEC, and woken when the screen comes back on.
+		// A new on or off command switches the TV even if the screen was
+		// already in that state, so `on` wakes a TV someone turned off with
+		// the remote. The change lands at the next file boundary.
 		now := time.Now()
-		if on := show.Schedule.awake(now) || now.Before(awakeUntil(wakePath)); on != screenOn {
+		o := readOverride(overridePath)
+		fresh := o != seen && o.active(now)
+		seen = o
+		if on := o.screenOn(show.Schedule, now); on != screenOn || fresh {
 			screenOn = on
-			if on {
+			switch until := o.Until.Format("Mon 15:04"); {
+			case o.active(now) && on:
+				log.Printf("screen on until %s (pi-display on)", until)
+			case o.active(now):
+				log.Printf("screen off until %s (pi-display off)", until)
+			case on:
 				log.Print("screen on")
-			} else {
+			default:
 				log.Print("screen off until the schedule turns it back on")
 			}
 			if show.TVPower {

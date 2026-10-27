@@ -12,7 +12,8 @@ Run these over SSH on the Pi.
 | `sudo pi-display config <code>` | Applies playback settings from the [config generator](/config) to this Pi only. See [display.toml](/docs/display-toml#one-pi-only). |
 | `sudo pi-display update` | Installs the latest release, keeping your settings. See [Updating](/docs/updating). |
 | `sudo pi-display uninstall` | Removes the slideshow and everything setup added. See [Uninstall](/docs/uninstall). |
-| `pi-display on [duration]` | Keeps the screen on outside its schedule. See [Staying on for an event](/docs/stay-on). |
+| `pi-display on [duration]` | Turns the screen on for a while, whatever its schedule says. See [Turning the screen on or off](/docs/stay-on). |
+| `pi-display off [duration]` | Turns the screen off and puts the TV in standby for a while. See [Turning the screen on or off](/docs/stay-on). |
 | `pi-display status` | Shows the version, media source, whether the service is running, and whether the screen should be on. Start here when a screen misbehaves. |
 | `pi-display logs` | Follows the slideshow's logs. Same as `journalctl -u pi-display -f`. |
 | `pi-display version` | Shows the installed release. |

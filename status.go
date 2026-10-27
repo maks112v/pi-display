@@ -80,14 +80,16 @@ func status() {
 	if err != nil {
 		row("show", "%s ignored: %v", showFile, err)
 	}
-	row("screen", "%s", screenState(show.Schedule, awakeUntil(wakePath), time.Now()))
+	row("screen", "%s", screenState(show.Schedule, readOverride(overridePath), time.Now()))
 }
 
 // screenState describes whether the screen should be on at now and why.
-func screenState(s *Schedule, override, now time.Time) string {
+func screenState(s *Schedule, o override, now time.Time) string {
 	switch {
-	case now.Before(override):
-		return "on until " + override.Format("Mon 15:04") + " (pi-display on)"
+	case o.active(now) && o.On:
+		return "on until " + o.Until.Format("Mon 15:04") + " (pi-display on)"
+	case o.active(now):
+		return "off until " + o.Until.Format("Mon 15:04") + " (pi-display off)"
 	case s == nil:
 		return "on, no schedule"
 	case s.awake(now):

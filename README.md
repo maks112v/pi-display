@@ -57,7 +57,8 @@ pi-display version           # show the installed release
 sudo pi-display update       # install the latest release, keeping your settings
 sudo pi-display config <code> # apply slideshow settings from the config generator to this Pi only
 sudo pi-display uninstall    # remove Pi Display and everything setup added
-pi-display on 2h             # stay on outside the schedule (see below)
+pi-display on 2h             # screen on for 2 hours, whatever the schedule says (see below)
+pi-display off 2h            # screen and TV off for 2 hours
 ```
 
 `update` downloads the build for your Pi, checks it against the release's `SHA256SUMS`, swaps it in, and restarts the slideshow.
@@ -120,17 +121,20 @@ The file is parsed strictly. If it has an unknown key, a wrong type, or a value 
 
 If the Pi was set up with a setup code, its slideshow settings are the starting point and `display.toml` overrides only the keys it sets. `[durations]` entries are added to the ones from the code.
 
-## Staying on for an event
+## Turning the screen on or off
 
-Outside the schedule the screen shows black, and with `tv_power` (on by default) the Pi puts the TV in standby over HDMI-CEC and wakes it when the schedule comes back. The TV needs CEC turned on in its settings, often under a brand name like Anynet+, Bravia Sync, or SimpLink. Set `tv_power = false` to leave the TV alone. To keep the slideshow running anyway, SSH in and run:
+Outside the schedule the screen shows black, and with `tv_power` (on by default) the Pi puts the TV in standby over HDMI-CEC and wakes it when the schedule comes back. The TV needs CEC turned on in its settings, often under a brand name like Anynet+, Bravia Sync, or SimpLink. Set `tv_power = false` to leave the TV alone.
+
+To override the schedule for a while, SSH in and run:
 
 ```sh
 pi-display on        # on for 1 hour
 pi-display on 3h30m  # on for any duration
-pi-display on 0      # cancel and go back to the schedule
+pi-display off 2h    # off for any duration, TV in standby
+pi-display on 0      # cancel either and go back to the schedule
 ```
 
-It takes effect within 5 seconds and survives a reboot. Schedule changes and expired overrides take effect at the next slide. Set the Pi's timezone with `sudo raspi-config` so the schedule matches the wall clock.
+`on` also wakes a TV someone turned off with the remote, and `off` works with or without a schedule. A new command replaces the last one, takes effect at the next slide, and survives a reboot. Schedule changes and expired overrides take effect at the next slide. Set the Pi's timezone with `sudo raspi-config` so the schedule matches the wall clock.
 
 ## Files on the Pi
 
@@ -140,5 +144,5 @@ It takes effect within 5 seconds and survives a reboot. Schedule changes and exp
 | `/usr/local/bin/pi-display` | Installed binary |
 | `/etc/systemd/system/pi-display.service` | Boot service |
 | `/var/lib/pi-display/media` | Mirrored SMB or Drive files |
-| `/var/lib/pi-display/awake-until` | End time of a `pi-display on` override |
+| `/var/lib/pi-display/override` | A `pi-display on` or `off` override and when it ends |
 | `/usr/share/plymouth/themes/pi-display` | Boot logo theme, if Plymouth is installed |

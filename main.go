@@ -6,7 +6,8 @@
 //	                              # (code comes from the website's install page and skips the prompts)
 //	sudo pi-display config <code> # apply slideshow settings from the web config generator
 //	pi-display run                # what the service runs
-//	pi-display on [2h]            # stay on outside the schedule for a while (0 cancels)
+//	pi-display on [2h]            # screen on for a while, whatever the schedule says (0 cancels)
+//	pi-display off [2h]           # screen and TV off for a while (0 cancels)
 //	sudo pi-display update        # install the latest release and restart
 //	sudo pi-display uninstall     # remove the service, program, settings, and media
 //	pi-display status             # version, source, service health, and screen state
@@ -40,8 +41,8 @@ func main() {
 		err = setup(ctx, argAt(2))
 	case "config":
 		err = applyConfig(argAt(2))
-	case "on":
-		err = keepOn(wakePath, argAt(2))
+	case "on", "off":
+		err = setOverride(overridePath, command == "on", argAt(2))
 	case "update":
 		err = update(ctx)
 	case "uninstall":
@@ -53,7 +54,7 @@ func main() {
 	case "version":
 		fmt.Println(version)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: pi-display <setup [code]|config <code>|run|on [duration]|update|uninstall|status|logs|version>")
+		fmt.Fprintln(os.Stderr, "usage: pi-display <setup [code]|config <code>|run|on|off [duration]|update|uninstall|status|logs|version>")
 		os.Exit(2)
 	}
 	if err != nil && !errors.Is(err, context.Canceled) {
