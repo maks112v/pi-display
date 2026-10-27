@@ -177,7 +177,11 @@ func (c *clock) UnmarshalText(text []byte) error {
 }
 
 func (c clock) MarshalText() ([]byte, error) {
-	return fmt.Appendf(nil, "%02d:%02d", c/60, c%60), nil
+	return []byte(c.String()), nil
+}
+
+func (c clock) String() string {
+	return fmt.Sprintf("%02d:%02d", c/60, c%60)
 }
 
 // awake reports whether the schedule has the screen on at t.

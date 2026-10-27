@@ -124,7 +124,7 @@ func setup(ctx context.Context, code string) error {
 			return err
 		}
 	}
-	fmt.Println("Done. The slideshow is starting now and on every boot. Logs: journalctl -u pi-display -f")
+	fmt.Println("Done. The slideshow is starting now and on every boot. Logs: pi-display logs")
 
 	// The running desktop still holds the screen until it stops. Stop it last
 	// and without waiting, since setup may be running in one of its terminals.

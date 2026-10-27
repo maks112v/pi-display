@@ -24,3 +24,83 @@
     }
   }
 }
+
+/* Docs page content rendered from Markdown (src/content/docs). */
+.prose {
+  @apply flex flex-col gap-5 text-[15px] leading-[26px] text-[#d4d4d4];
+
+  & h2 {
+    @apply mt-8 scroll-mt-24 text-xl leading-7 font-semibold tracking-[-0.015em] text-fg;
+  }
+  & a {
+    @apply text-fg underline decoration-edge underline-offset-4 hover:decoration-fg;
+  }
+  & strong {
+    @apply font-semibold text-fg;
+  }
+  & :not(pre) > code {
+    @apply rounded border border-line bg-screen px-1.5 py-px font-mono text-[13px] text-fg;
+  }
+  & ul,
+  & ol {
+    @apply flex flex-col gap-2 pl-5;
+  }
+  & ul {
+    @apply list-disc marker:text-faint;
+  }
+  & ol {
+    @apply list-decimal marker:font-mono marker:text-[13px] marker:text-faint;
+  }
+  & blockquote {
+    @apply flex gap-3 rounded-[10px] border border-line px-4 py-3.5 text-sm leading-[22px] text-muted;
+
+    &::before {
+      @apply mt-[3px] size-4 shrink-0 bg-muted content-[''];
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black'%3E%3Ccircle cx='8' cy='8' r='6.5' stroke-width='1.3'/%3E%3Cpath d='M8 7v4.5M8 4.5V5' stroke-width='1.5'/%3E%3C/svg%3E");
+    }
+  }
+  & table {
+    @apply w-full border-collapse text-sm leading-[22px];
+  }
+  & th {
+    @apply border-b border-line py-2.5 pr-4 text-left font-medium text-muted;
+  }
+  & td {
+    @apply border-b border-line py-3 pr-4 align-top;
+  }
+  & td:first-child code {
+    @apply whitespace-nowrap;
+  }
+  & dl {
+    @apply border-t border-line;
+  }
+  & dt {
+    @apply flex flex-wrap items-baseline gap-x-2.5 pt-4;
+
+    & code {
+      @apply border-0 bg-transparent p-0 text-sm font-semibold;
+    }
+    & span {
+      @apply font-mono text-xs text-faint;
+    }
+  }
+  & dd {
+    @apply border-b border-line pt-1.5 pb-4 text-sm leading-[22px] text-muted;
+  }
+}
+
+/* Code blocks: a label and copy button above Shiki's output. */
+.code-block {
+  @apply overflow-hidden rounded-[10px] border border-line bg-screen;
+
+  & figcaption {
+    @apply flex h-10 items-center justify-between border-b border-line pr-2 pl-4 font-mono text-xs text-muted;
+  }
+  & button {
+    @apply rounded px-2 py-1 font-sans text-xs text-faint hover:text-fg;
+  }
+  & pre {
+    @apply overflow-x-auto p-4 font-mono text-[13px] leading-[22px];
+    background-color: transparent !important;
+  }
+}

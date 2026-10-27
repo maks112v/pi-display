@@ -7,6 +7,8 @@
 //	pi-display run                # what the service runs
 //	pi-display on [2h]            # stay on outside the schedule for a while (0 cancels)
 //	sudo pi-display update        # install the latest release and restart
+//	pi-display status             # version, source, service health, and screen state
+//	pi-display logs               # follow the service's logs (journalctl -u pi-display -f)
 //	pi-display version
 package main
 
@@ -17,6 +19,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 )
@@ -37,15 +40,29 @@ func main() {
 		err = keepOn(wakePath, argAt(2))
 	case "update":
 		err = update(ctx)
+	case "status":
+		status()
+	case "logs":
+		err = followLogs()
 	case "version":
 		fmt.Println(version)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: pi-display <setup [code]|run|on [duration]|update|version>")
+		fmt.Fprintln(os.Stderr, "usage: pi-display <setup [code]|run|on [duration]|update|status|logs|version>")
 		os.Exit(2)
 	}
 	if err != nil && !errors.Is(err, context.Canceled) {
 		log.Fatal(err)
 	}
+}
+
+// followLogs replaces this process with journalctl so Ctrl-C and paging
+// behave exactly as they do when running it directly.
+func followLogs() error {
+	journalctl, err := exec.LookPath("journalctl")
+	if err != nil {
+		return err
+	}
+	return syscall.Exec(journalctl, []string{"journalctl", "-u", "pi-display", "-f"}, os.Environ())
 }
 
 func argAt(i int) string {

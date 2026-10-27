@@ -1,0 +1,35 @@
+---
+// Grouped page links, used by the docs sidebar and the mobile menu.
+import { docPages, nav } from "../lib/docs";
+
+interface Props {
+  current: string;
+}
+
+const { current } = Astro.props;
+const pages = new Map((await docPages()).map((page) => [page.id, page]));
+---
+
+<div class="flex flex-col gap-7">
+  {
+    nav.map(({ group, slugs }) => (
+      <div class="flex flex-col gap-0.5">
+        <span class="pb-2 pl-3 text-xs font-medium text-faint">{group}</span>
+        {slugs.map((slug) => {
+          const page = pages.get(slug);
+          return (
+            page && (
+              <a
+                href={page.href}
+                aria-current={slug === current ? "page" : undefined}
+                class="border-l-2 border-transparent py-1.5 pl-2.5 text-sm text-muted hover:text-fg aria-[current=page]:border-accent aria-[current=page]:font-medium aria-[current=page]:text-fg"
+              >
+                {page.data.title}
+              </a>
+            )
+          );
+        })}
+      </div>
+    ))
+  }
+</div>

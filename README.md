@@ -50,7 +50,8 @@ Put images and videos in the folder. New files show up within about 30 seconds. 
 ## Day to day
 
 ```sh
-journalctl -u pi-display -f  # watch the logs
+pi-display status            # version, source, service health, and whether the screen is on
+pi-display logs              # watch the logs (journalctl -u pi-display -f)
 pi-display version           # show the installed release
 sudo pi-display update       # install the latest release, keeping your settings
 pi-display on 2h             # stay on outside the schedule (see below)
