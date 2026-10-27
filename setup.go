@@ -100,6 +100,7 @@ func setup(ctx context.Context, code string) error {
 
 	// mpv draws straight to the display, which only works when no desktop
 	// session holds the screen.
+	stopDesktop := false
 	if target, _ := exec.Command("systemctl", "get-default").Output(); strings.TrimSpace(string(target)) == "graphical.target" {
 		ok := code != ""
 		if !ok {
@@ -112,6 +113,7 @@ func setup(ctx context.Context, code string) error {
 				return err
 			}
 			fmt.Println("Desktop disabled at boot. Undo with: sudo systemctl set-default graphical.target")
+			stopDesktop = exec.Command("systemctl", "is-active", "--quiet", "display-manager").Run() == nil
 		} else {
 			fmt.Println("Leaving the desktop on; the slideshow will fail until it is off.")
 		}
@@ -122,7 +124,15 @@ func setup(ctx context.Context, code string) error {
 			return err
 		}
 	}
-	fmt.Println("Done. The slideshow starts on every boot. Logs: journalctl -u pi-display -f")
+	fmt.Println("Done. The slideshow is starting now and on every boot. Logs: journalctl -u pi-display -f")
+
+	// The running desktop still holds the screen until it stops. Stop it last
+	// and without waiting, since setup may be running in one of its terminals.
+	// The service's Restart=always picks up the screen once it is free.
+	if stopDesktop {
+		fmt.Println("Stopping the desktop so the slideshow can take the screen.")
+		return runCmd("systemctl", "--no-block", "stop", "display-manager")
+	}
 	return nil
 }
 

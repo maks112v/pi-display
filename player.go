@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -30,9 +31,48 @@ type mpvEvent struct {
 	Reason string          `json:"reason"`
 }
 
+// drmOutput finds the first connected display under sysDRM (normally
+// /sys/class/drm), e.g. ("/dev/dri/card1", "HDMI-A-1"). mpv otherwise opens
+// card0, which on a Pi 5 is the 3D-only GPU with no outputs, leaving the
+// console on screen. ok is false when no output reports connected.
+func drmOutput(sysDRM string) (device, connector string, ok bool) {
+	paths, _ := filepath.Glob(filepath.Join(sysDRM, "card*-*"))
+	for _, p := range paths {
+		status, err := os.ReadFile(filepath.Join(p, "status"))
+		if err != nil || strings.TrimSpace(string(status)) != "connected" {
+			continue
+		}
+		card, connector, _ := strings.Cut(filepath.Base(p), "-")
+		return "/dev/dri/" + card, connector, true
+	}
+	return "", "", false
+}
+
+// waitForDisplay returns the connected display, waiting for one if the
+// screen is unplugged or HDMI hasn't come up yet at boot. Starting mpv before
+// then would leave it drawing to the wrong card.
+func waitForDisplay(ctx context.Context) (device, connector string, err error) {
+	for logged := false; ; logged = true {
+		if device, connector, ok := drmOutput("/sys/class/drm"); ok {
+			if logged {
+				log.Printf("display connected on %s %s", device, connector)
+			}
+			return device, connector, nil
+		}
+		if !logged {
+			log.Print("waiting for a display to be connected")
+		}
+		select {
+		case <-ctx.Done():
+			return "", "", ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
 func startMPV(ctx context.Context, socket string) (*mpv, error) {
 	_ = os.Remove(socket)
-	cmd := exec.CommandContext(ctx, "mpv",
+	args := []string{
 		"--no-config", // ignore any mpv.conf or scripts lying around
 		"--load-scripts=no",
 		"--ytdl=no",
@@ -48,14 +88,19 @@ func startMPV(ctx context.Context, socket string) (*mpv, error) {
 		"--hwdec=auto-safe",
 		"--keep-open=yes", // hold a video's last frame until the next file replaces it
 		"--image-display-duration=inf",
-		"--input-ipc-server="+socket,
-	)
+		"--input-ipc-server=" + socket,
+	}
+	device, connector, err := waitForDisplay(ctx)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, "--drm-device="+device, "--drm-connector="+connector)
+	cmd := exec.CommandContext(ctx, "mpv", args...)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start mpv: %w", err)
 	}
 
 	var conn net.Conn
-	var err error
 	for range 100 {
 		if conn, err = net.Dial("unix", socket); err == nil {
 			break
