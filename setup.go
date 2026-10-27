@@ -26,9 +26,12 @@ const (
 
 // The service runs as the account that ran setup (already in the video and
 // render groups on Raspberry Pi OS) and is sandboxed to its state directory.
+// It starts after the boot splash quits, like getty does: mpv started while
+// Plymouth holds the screen loses it when the splash exits, leaving the
+// console showing.
 const unitTemplate = `[Unit]
 Description=pi-display slideshow
-After=local-fs.target
+After=local-fs.target plymouth-quit-wait.service
 
 [Service]
 User=%s
