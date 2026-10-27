@@ -2,27 +2,59 @@
 
 Turns a Raspberry Pi into a full-screen slideshow of every image and video in a folder, played in filename order. The folder can be local, on an SMB share, or a public Google Drive folder. The Pi boots straight into the slideshow whenever it gets power.
 
-## Install
+## Getting started
 
-On a Pi running Raspberry Pi OS Lite (Trixie or newer):
+### 1. Prepare the Pi
+
+Flash an SD card with [Raspberry Pi Imager](https://www.raspberrypi.com/software/):
+
+- **OS:** Raspberry Pi OS Lite (64-bit), Trixie or newer. Use the 32-bit Lite image only on a Pi older than a Pi 3 or Zero 2 W.
+- **Customisation:** set a username and password, Wi-Fi if you are not on Ethernet, your timezone, and turn on SSH.
+
+Plug the Pi into the display, boot it, and SSH in as the user you created.
+
+### 2. Download pi-display
 
 ```sh
 curl -fsSLo pi-display "https://github.com/maks112v/pi-display/releases/latest/download/pi-display-$(dpkg --print-architecture)"
 chmod +x pi-display
+```
+
+This picks the right build for your OS (`arm64` or `armhf`). Every release is listed on the [releases page](https://github.com/maks112v/pi-display/releases).
+
+### 3. Run setup
+
+```sh
 sudo ./pi-display setup
 ```
 
-Setup asks for the folder (`smb://nas.local/share/path`, `https://drive.google.com/drive/folders/...`, or `/home/pi/media`) and, for SMB, a username and password. A Drive folder needs no sign-in, but it must be shared as "Anyone with the link". It tests the connection, installs mpv if needed, then installs and starts a systemd service. Re-run it any time to point at a different folder.
+Run it with `sudo` from your normal user, not as root. The slideshow runs as that user. Setup:
 
-Logs: `journalctl -u pi-display -f`
+1. Installs mpv if it is missing.
+2. Asks for the media folder. Any of these work:
+   - SMB share: `smb://nas.local/share/path`. You are then asked for a username (blank for guest) and password.
+   - Public Google Drive folder: `https://drive.google.com/drive/folders/...`. No sign-in, but the folder must be shared as "Anyone with the link".
+   - Local folder: an absolute path like `/home/pi/media`.
+3. Connects and reports how many images and videos it found. A wrong link or password stops setup here.
+4. Installs itself to `/usr/local/bin/pi-display` and adds a service that starts the slideshow on every boot. You can delete the downloaded `./pi-display` afterwards.
+5. If the Pi boots to a desktop, offers to boot to console instead. Say yes: the slideshow needs the screen to itself.
 
-To update to the latest release, keeping your settings:
+The slideshow starts as soon as setup finishes, and again whenever the Pi gets power. Re-run `sudo pi-display setup` any time to point it at a different folder.
+
+### 4. Add media
+
+Put images and videos in the folder. New files show up within about 30 seconds. To change timing, add a [`display.toml`](#displaytoml) to the same folder.
+
+## Day to day
 
 ```sh
-sudo pi-display update
+journalctl -u pi-display -f  # watch the logs
+pi-display version           # show the installed release
+sudo pi-display update       # install the latest release, keeping your settings
+pi-display on 2h             # stay on outside the schedule (see below)
 ```
 
-It downloads the build for your Pi, checks it against the release's `SHA256SUMS`, swaps it in, and restarts the slideshow. `pi-display version` shows what's installed.
+`update` downloads the build for your Pi, checks it against the release's `SHA256SUMS`, swaps it in, and restarts the slideshow.
 
 ## Releasing
 
