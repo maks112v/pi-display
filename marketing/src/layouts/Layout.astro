@@ -31,7 +31,7 @@ const links = [
   <body class="bg-bg font-sans text-fg antialiased">
     <div class="mx-auto max-w-[1168px] px-6 pb-24">
       <nav class="flex items-center justify-between gap-6 border-b border-line py-5">
-        <a href="/" class="flex items-center gap-2.5 font-semibold">
+        <a href="/" class="flex shrink-0 items-center gap-2.5 font-semibold whitespace-nowrap">
           <Logo />
           Pi Display
         </a>
@@ -39,9 +39,9 @@ const links = [
           <div class="hidden items-center gap-8 text-sm text-muted md:flex">
             {links.map((link) => <a href={link.href} class="hover:text-fg">{link.label}</a>)}
           </div>
-          <div class="flex items-center gap-2.5 text-sm">
+          <div class="flex shrink-0 items-center gap-2.5 text-sm whitespace-nowrap">
             <a href="/config" class="flex h-9 items-center rounded-md border border-edge px-3.5 font-medium hover:border-muted">
-              Config generator
+              Config<span class="hidden sm:inline">&nbsp;generator</span>
             </a>
             <a href="/install" class="flex h-9 items-center rounded-md bg-accent px-3.5 font-semibold text-bg hover:bg-accent/85">
               Install
