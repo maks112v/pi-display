@@ -40,6 +40,13 @@ export const defaultSettings: Settings = {
   schedule: null,
 };
 
+// Downloads the latest release for the Pi's architecture (arm64 or armhf)
+// and makes it executable. Matches step 2 of the README.
+export const installCommand = [
+  `curl -fsSLo pi-display "https://github.com/maks112v/pi-display/releases/latest/download/pi-display-$(dpkg --print-architecture)"`,
+  "chmod +x pi-display",
+].join("\n");
+
 // Same bound as maxSeconds in config.go.
 export const maxSeconds = 24 * 60 * 60;
 
