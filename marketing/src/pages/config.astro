@@ -1,0 +1,17 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ConfigGenerator from "../components/ConfigGenerator";
+---
+
+<Layout
+  title="Set up a screen · pi-display"
+  description="Generate the one-line setup command for a pi-display screen and the display.toml for its shared folder."
+>
+  <header class="flex flex-col gap-3 pt-20 pb-12">
+    <h1 class="text-[40px] leading-12 font-semibold tracking-[-0.03em]">Set up a screen</h1>
+    <p class="text-base text-muted">
+      Fill in your shared folder, then run the command on the Pi. Everything here stays in your browser.
+    </p>
+  </header>
+  <ConfigGenerator client:load />
+</Layout>

@@ -30,14 +30,16 @@ sudo ./pi-display setup
 
 Run it with `sudo` from your normal user, not as root. The slideshow runs as that user. Setup:
 
-1. Installs mpv if it is missing.
-2. Asks for the media folder. Any of these work:
+1. Asks for the media folder. Any of these work:
    - SMB share: `smb://nas.local/share/path`. You are then asked for a username (blank for guest) and password.
    - Public Google Drive folder: `https://drive.google.com/drive/folders/...`. No sign-in, but the folder must be shared as "Anyone with the link".
    - Local folder: an absolute path like `/home/pi/media`.
-3. Connects and reports how many images and videos it found. A wrong link or password stops setup here.
+2. Connects and reports how many images and videos it found. A wrong link or password stops setup here.
+3. Installs mpv if it is missing.
 4. Installs itself to `/usr/local/bin/pi-display` and adds a service that starts the slideshow on every boot. You can delete the downloaded `./pi-display` afterwards.
 5. If the Pi boots to a desktop, offers to boot to console instead. Say yes: the slideshow needs the screen to itself.
+
+To skip the questions, fill in the config generator on the website and run the command it gives you: `sudo ./pi-display setup <code>`. The code carries the folder, login, and slideshow settings, and setup turns the desktop off at boot without asking. It includes the password encoded, not encrypted, so treat it like the password.
 
 The slideshow starts as soon as setup finishes, and again whenever the Pi gets power. Re-run `sudo pi-display setup` any time to point it at a different folder.
 
@@ -56,6 +58,8 @@ pi-display on 2h             # stay on outside the schedule (see below)
 
 `update` downloads the build for your Pi, checks it against the release's `SHA256SUMS`, swaps it in, and restarts the slideshow.
 
+With an SMB folder, each screen also appends its log to `<hostname>.pi-display.log` in that folder after every sync, so you can check every screen from the share without SSH. Lines logged while the share is unreachable are held (up to 500) and written once it is back. The file starts over after 1 MB. Players never show `.log` files. The login needs write access to the folder; with a read-only login the logs stay in journald only.
+
 ## Releasing
 
 Push a version tag. GitHub Actions runs the tests, builds `arm64` and `armhf` binaries, and publishes a release with checksums.
@@ -69,10 +73,10 @@ To build from source instead: `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o
 
 ## How it works
 
-- SMB and Drive folders are mirrored into `/var/lib/pi-display/media` every 30 seconds. Playback runs from that copy, so the slideshow starts at boot before the network is up and keeps going if the source goes offline. Make sure the SD card has room for the whole folder.
+- SMB and Drive folders are mirrored into `/var/lib/pi-display/media` every 30 seconds. Playback runs from that copy, so the slideshow starts at boot before the network is up and keeps going if the source goes offline. Make sure the SD card has room for the whole folder. A file that would leave less than 256 MB free is skipped and logged instead of filling the card; the rest of the folder keeps syncing.
 - Drive is read through its public folder view and download links, not the API, so Google can break it by changing those pages. Native Google Docs are ignored. If two files share a name, the first one listed wins.
 - Only files at the top level of the folder are used. Subfolders and hidden files are ignored.
-- Order is natural filename order: `2.jpg` plays before `10.jpg`.
+- Order is natural filename order: `2.jpg` plays before `10.jpg`. With `shuffle = true`, every file plays once per loop in a new random order each time, and the last file of one loop never plays first in the next.
 - The folder and `display.toml` are re-read before every file, so changes show up within one slide (plus up to 30 seconds of sync).
 - mpv does the decoding and draws straight to the screen with hardware decoding. `pi-display` decides what plays and for how long.
 
@@ -86,6 +90,7 @@ Drop an optional `display.toml` into the folder:
 image_seconds = 10   # how long each image shows (default 10)
 mute = true          # mute video audio (default true)
 fit = "contain"      # "contain" letterboxes, "cover" fills and crops (default "contain")
+shuffle = false      # random order, reshuffled every time the folder loops (default false)
 
 # Per-image overrides, in seconds
 [durations]
@@ -99,6 +104,8 @@ off = "22:00"
 ```
 
 The file is parsed strictly. If it has an unknown key, a wrong type, or a value out of range, the whole file is ignored, the last good settings stay in effect, and the error is logged. Nothing in it is passed to mpv as raw options.
+
+If the Pi was set up with a setup code, its slideshow settings are the starting point and `display.toml` overrides only the keys it sets. `[durations]` entries are added to the ones from the code.
 
 ## Staying on for an event
 

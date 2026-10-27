@@ -174,12 +174,13 @@ func (m *mpv) drain() {
 	}
 }
 
-// play loops through dir forever. The folder, display.toml, and any
-// `pi-display on` override are re-read before every file, so changes show up
-// without restarting anything.
-func play(ctx context.Context, m *mpv, dir string) error {
-	show := defaultShow
+// play loops through dir forever, with base as the settings display.toml is
+// layered over. The folder, display.toml, and any `pi-display on` override are
+// re-read before every file, so changes show up without restarting anything.
+func play(ctx context.Context, m *mpv, dir string, base Show) error {
+	show := base
 	current := ""
+	order := newPlayOrder()
 	screenOn := true
 	var lastProblem string
 	report := func(problem string) {
@@ -191,7 +192,7 @@ func play(ctx context.Context, m *mpv, dir string) error {
 
 	for {
 		problem := ""
-		if s, err := loadShow(dir); err != nil {
+		if s, err := loadShow(dir, base); err != nil {
 			problem = fmt.Sprintf("ignoring %s, keeping previous settings: %v", showFile, err)
 		} else {
 			show = s
@@ -246,7 +247,8 @@ func play(ctx context.Context, m *mpv, dir string) error {
 			continue
 		}
 
-		next := nextAfter(names, current)
+		order.shuffle = show.Shuffle
+		next := order.next(names, current)
 		image := isImage(next)
 		if next == current && image {
 			// A lone image: keep it on screen instead of reloading it.

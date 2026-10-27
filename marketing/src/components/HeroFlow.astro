@@ -1,0 +1,293 @@
+---
+// Homepage hero diagram: media sources feed a Raspberry Pi, which plays on
+// every screen. On xl screens the parts sit on fixed coordinates so the SVG
+// wires and the animated packets line up; below xl they stack vertically.
+
+type Slide = { kind: "title"; text: string } | { kind: "menu"; label: string } | { kind: "video" };
+
+const sources = [
+  { name: "SMB share", path: "smb://nas.local/screens", icon: "server" },
+  { name: "Google Drive", path: "drive.google.com/…/Screens", icon: "drive" },
+  { name: "Local folder", path: "/home/pi/media", icon: "folder" },
+] as const;
+
+// Each screen crossfades between its two slides when an outbound packet arrives.
+const screens: { name: string; slides: [Slide, Slide] }[] = [
+  { name: "Lobby", slides: [{ kind: "title", text: "Welcome" }, { kind: "title", text: "Open 8 to 6" }] },
+  { name: "Counter", slides: [{ kind: "menu", label: "LUNCH" }, { kind: "menu", label: "COFFEE" }] },
+  { name: "Window", slides: [{ kind: "video" }, { kind: "title", text: "New in store" }] },
+];
+
+// Wire paths in the 1120×432 xl canvas: sources → Pi, then Pi → screens.
+const inbound = ["M280 54 C360 54 360 204 440 204", "M280 204 H440", "M280 354 C360 354 360 204 440 204"];
+const outbound = ["M640 204 C784 204 784 54 928 54", "M640 204 H928", "M640 204 C784 204 784 354 928 354"];
+---
+
+<section
+  aria-label="SMB, Google Drive and local folders feeding a Raspberry Pi that plays on three screens"
+  class="hero-flow relative flex flex-col items-center xl:mx-auto xl:block xl:h-[432px] xl:w-[1120px]"
+  data-hero-flow
+>
+  <svg
+    width="1120"
+    height="432"
+    viewBox="0 0 1120 432"
+    fill="none"
+    class="absolute top-0 left-0 hidden text-edge xl:block"
+    aria-hidden="true"
+  >
+    {[...inbound, ...outbound].map((d) => <path d={d} stroke="currentColor" stroke-width="1.5" />)}
+  </svg>
+
+  <div class="hidden xl:block" aria-hidden="true">
+    {inbound.map((d, i) => <span class="packet packet-in bg-fg" style={`offset-path: path('${d}'); --i: ${i}`} />)}
+    {outbound.map((d, i) => <span class="packet packet-out bg-live" style={`offset-path: path('${d}'); --i: ${i}`} />)}
+  </div>
+
+  <ul class="grid w-full gap-3 sm:grid-cols-3 xl:absolute xl:top-[26px] xl:left-0 xl:flex xl:w-[280px] xl:flex-col xl:gap-[94px]">
+    {
+      sources.map((source) => (
+        <li class="flex h-14 items-center gap-3.5 rounded-md border border-edge bg-bg px-4">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" class="shrink-0 text-muted" aria-hidden="true">
+            {source.icon === "server" && (
+              <g stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="3" width="16" height="6" rx="1" />
+                <rect x="2" y="11" width="16" height="6" rx="1" />
+              </g>
+            )}
+            {source.icon === "drive" && (
+              <path
+                d="M7 3 H13 L19 13 L16 18 H4 L1 13 Z M7 3 L13 13 H19 M13 3 L4 18 M1 13 H10"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linejoin="round"
+              />
+            )}
+            {source.icon === "folder" && (
+              <path d="M2 4.5 H8 L10 6.5 H18 V16 H2 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            )}
+          </svg>
+          <div class="flex min-w-0 flex-col gap-0.5">
+            <span class="text-sm font-medium">{source.name}</span>
+            <span class="truncate font-mono text-xs text-muted">{source.path}</span>
+          </div>
+        </li>
+      ))
+    }
+  </ul>
+
+  <div class="h-10 w-px bg-edge xl:hidden" aria-hidden="true"></div>
+
+  <figure class="flex w-[200px] flex-col items-center gap-3.5 xl:absolute xl:top-[144px] xl:left-[440px]">
+    <svg width="200" height="120" viewBox="0 0 200 120" fill="none" aria-hidden="true">
+      <rect x="0.75" y="0.75" width="198.5" height="118.5" rx="8" fill="#0d0d0d" stroke="#fff" stroke-width="1.5" />
+      <g stroke="#555" stroke-width="1.2">
+        <circle cx="10" cy="10" r="3" />
+        <circle cx="10" cy="110" r="3" />
+        <circle cx="154" cy="10" r="3" />
+        <circle cx="154" cy="110" r="3" />
+        <rect x="54" y="38" width="40" height="40" rx="3" fill="#1a1a1a" />
+        <rect x="104" y="44" width="22" height="28" rx="2" stroke="#333" />
+        <rect x="168" y="12" width="32" height="28" rx="2" fill="#000" />
+        <rect x="168" y="46" width="32" height="28" rx="2" fill="#000" />
+        <rect x="168" y="80" width="32" height="28" rx="2" fill="#000" />
+        <rect x="20" y="108" width="14" height="12" rx="1.5" fill="#000" />
+        <rect x="48" y="108" width="18" height="12" rx="1.5" fill="#000" />
+        <rect x="76" y="108" width="18" height="12" rx="1.5" fill="#000" />
+      </g>
+      <g fill="#555">
+        {
+          Array.from({ length: 15 }, (_, i) => (
+            <>
+              <circle cx={24 + i * 8} cy="8" r="1.5" />
+              <circle cx={24 + i * 8} cy="15" r="1.5" />
+            </>
+          ))
+        }
+      </g>
+      <circle class="led" cx="18" cy="96" r="2.5" fill="#3ddc84" />
+    </svg>
+    <figcaption class="flex flex-col items-center gap-1">
+      <span class="text-sm font-semibold">Raspberry Pi</span>
+      <span class="font-mono text-xs text-muted">synced 12s ago</span>
+    </figcaption>
+  </figure>
+
+  <div class="h-10 w-px bg-edge xl:hidden" aria-hidden="true"></div>
+
+  <div class="grid w-full grid-cols-3 gap-4 xl:absolute xl:top-0 xl:right-0 xl:flex xl:w-[192px] xl:flex-col xl:gap-[18px]">
+    {
+      screens.map((screen, i) => (
+        <figure class="flex flex-col gap-2">
+          <div class="relative aspect-video overflow-hidden rounded border border-[#555] bg-screen xl:aspect-auto xl:h-[108px]">
+            {screen.slides.map((slide, s) => (
+              <div
+                class:list={["absolute inset-0 flex items-center bg-screen", s === 1 && "slide-next"]}
+                style={`--i: ${i}`}
+              >
+                {slide.kind === "title" && (
+                  <span class="w-full text-center text-[15px] font-semibold tracking-[-0.01em] xl:text-[17px]">
+                    {slide.text}
+                  </span>
+                )}
+                {slide.kind === "menu" && (
+                  <div class="flex w-full flex-col gap-2 px-[12%]">
+                    <span class="text-[11px] leading-3.5 font-semibold tracking-[0.08em]">{slide.label}</span>
+                    <div class="h-1 w-4/5 rounded-sm bg-edge" />
+                    <div class="h-1 w-2/3 rounded-sm bg-edge" />
+                    <div class="h-1 w-3/4 rounded-sm bg-edge" />
+                  </div>
+                )}
+                {slide.kind === "video" && (
+                  <svg width="28" height="28" viewBox="0 0 28 28" class="mx-auto" aria-hidden="true">
+                    <circle cx="14" cy="14" r="13" stroke="currentColor" stroke-width="1.5" fill="none" />
+                    <path d="M11 9 L19 14 L11 19 Z" fill="currentColor" />
+                  </svg>
+                )}
+              </div>
+            ))}
+          </div>
+          <figcaption class="flex items-center justify-between text-[13px]">
+            <span>{screen.name}</span>
+            <span class="flex items-center gap-1.5 text-muted">
+              <span class="size-1.5 rounded-full bg-live" />
+              Playing
+            </span>
+          </figcaption>
+        </figure>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  /*
+   * One 6s cycle: packets travel into the Pi, its LED blinks, then packets
+   * travel out and each screen swaps slides as its packet arrives. Slides run
+   * on a 12s timeline so they alternate once per cycle. Everything pauses when
+   * the hero is off screen and is skipped for reduced motion.
+   */
+  .packet {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    opacity: 0;
+    offset-rotate: 0deg;
+    animation-duration: 6s;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+  }
+
+  .packet-in {
+    animation-name: packet-in;
+    animation-delay: calc(var(--i) * 150ms);
+  }
+
+  .packet-out {
+    animation-name: packet-out;
+    animation-delay: calc(var(--i) * 250ms);
+  }
+
+  .led {
+    animation: led 6s infinite;
+  }
+
+  .slide-next {
+    opacity: 0;
+    animation: slide 12s infinite;
+    animation-delay: calc(var(--i) * 250ms);
+  }
+
+  .hero-flow[data-paused] :is(.packet, .led, .slide-next) {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .packet {
+      display: none;
+    }
+    .led,
+    .slide-next {
+      animation: none;
+    }
+  }
+
+  @keyframes packet-in {
+    0% {
+      offset-distance: 0%;
+      opacity: 0;
+    }
+    4% {
+      opacity: 1;
+    }
+    26% {
+      offset-distance: 100%;
+      opacity: 1;
+    }
+    28%,
+    100% {
+      offset-distance: 100%;
+      opacity: 0;
+    }
+  }
+
+  @keyframes led {
+    0%,
+    28%,
+    34%,
+    100% {
+      opacity: 1;
+    }
+    31% {
+      opacity: 0.2;
+    }
+  }
+
+  @keyframes packet-out {
+    0%,
+    32% {
+      offset-distance: 0%;
+      opacity: 0;
+    }
+    35% {
+      opacity: 1;
+    }
+    58% {
+      offset-distance: 100%;
+      opacity: 1;
+    }
+    60%,
+    100% {
+      offset-distance: 100%;
+      opacity: 0;
+    }
+  }
+
+  /* Packets land at 58% of 6s, which is 29% and 79% of this 12s timeline. */
+  @keyframes slide {
+    0%,
+    29% {
+      opacity: 0;
+    }
+    32%,
+    79% {
+      opacity: 1;
+    }
+    82%,
+    100% {
+      opacity: 0;
+    }
+  }
+</style>
+
+<script>
+  // Pause the animation while the hero is scrolled out of view.
+  for (const flow of document.querySelectorAll<HTMLElement>("[data-hero-flow]")) {
+    new IntersectionObserver((entries) => {
+      flow.toggleAttribute("data-paused", !entries.some((entry) => entry.isIntersecting));
+    }).observe(flow);
+  }
+</script>

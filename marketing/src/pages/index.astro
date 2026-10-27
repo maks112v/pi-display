@@ -1,4 +1,5 @@
 ---
+import HeroFlow from "../components/HeroFlow.astro";
 import Layout from "../layouts/Layout.astro";
 
 const repo = "https://github.com/maks112v/pi-display";
@@ -7,16 +8,6 @@ const button = {
   primary: "rounded-md bg-fg px-5 py-3 text-[15px] font-medium text-bg hover:bg-muted",
   secondary: "rounded-md border border-edge px-5 py-3 text-[15px] font-medium hover:border-muted",
 };
-
-// What the diagram shows sitting in the shared folder.
-const files = [
-  { name: "01_welcome.jpg", kind: "image" },
-  { name: "02_lunch-menu.png", kind: "image" },
-  { name: "03_promo.mp4", kind: "video" },
-  { name: "display.toml", kind: "settings" },
-];
-
-const screens = ["Lobby", "Counter", "Window"] as const;
 
 const steps = [
   {
@@ -51,8 +42,8 @@ const features = [
       Simple digital signage for any TV.
     </h1>
     <p class="max-w-[560px] text-lg leading-7 text-muted">
-      Put images and videos in a shared folder. Every Raspberry Pi connected to it plays them full screen, in order,
-      from the moment it powers on.
+      Point a Raspberry Pi at an SMB share, a Google Drive folder, or a local folder. It plays every image and video
+      full screen, in order, from the moment it powers on.
     </p>
     <div class="flex gap-3 pt-3">
       <a href="/config" class={button.primary}>Set up a screen</a>
@@ -60,65 +51,7 @@ const features = [
     </div>
   </section>
 
-  <section
-    aria-label="A shared folder playing on three screens"
-    class="flex flex-col items-center justify-between gap-10 xl:gap-6 rounded-xl border border-line px-6 py-10 xl:flex-row xl:px-16 xl:py-14"
-  >
-    <div class="w-full xl:w-[340px] xl:shrink-0">
-      <div class="flex items-center gap-2.5 border-b border-line pb-4 font-mono text-[13px]">
-        <svg width="18" height="14" viewBox="0 0 18 14" fill="none" aria-hidden="true">
-          <path d="M1 2 H7 L9 4 H17 V13 H1 Z" stroke="currentColor" class="text-muted" stroke-width="1.5"></path>
-        </svg>
-        smb://nas.local/screens
-      </div>
-      <ul class="font-mono text-[13px]">
-        {
-          files.map((file) => (
-            <li class="flex justify-between border-b border-line py-3 last:border-b-0">
-              <span>{file.name}</span>
-              <span class="text-faint">{file.kind}</span>
-            </li>
-          ))
-        }
-      </ul>
-    </div>
-
-    <svg width="72" height="12" viewBox="0 0 72 12" fill="none" class="hidden shrink-0 text-[#444] xl:block" aria-hidden="true">
-      <path d="M0 6 H70 M64 1 L70 6 L64 11" stroke="currentColor" stroke-width="1.5"></path>
-    </svg>
-
-    <div class="grid w-full grid-cols-3 gap-4 xl:flex xl:w-auto">
-      {
-        screens.map((screen) => (
-          <figure class="flex flex-col gap-3 xl:w-[160px]">
-            <div class="flex aspect-video items-center justify-center rounded border border-edge bg-screen">
-              {screen === "Lobby" && <span class="text-[15px] font-semibold">Welcome</span>}
-              {screen === "Counter" && (
-                <div class="flex w-full flex-col gap-1.5 px-4">
-                  <div class="h-1 w-3/5 rounded-sm bg-[#555]" />
-                  <div class="h-1 w-4/5 rounded-sm bg-edge" />
-                  <div class="h-1 w-[70%] rounded-sm bg-edge" />
-                  <div class="h-1 w-1/2 rounded-sm bg-edge" />
-                </div>
-              )}
-              {screen === "Window" && (
-                <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M8 5 L19 12 L8 19 Z" fill="currentColor" />
-                </svg>
-              )}
-            </div>
-            <figcaption class="flex items-center justify-between text-[13px]">
-              <span>{screen}</span>
-              <span class="flex items-center gap-1.5 text-muted">
-                <span class="size-1.5 rounded-full bg-live" />
-                Playing
-              </span>
-            </figcaption>
-          </figure>
-        ))
-      }
-    </div>
-  </section>
+  <HeroFlow />
 
   <section id="how-it-works" class="flex scroll-mt-8 flex-col gap-10 pt-30">
     <h2 class="text-[28px] font-semibold tracking-[-0.02em]">How it works</h2>

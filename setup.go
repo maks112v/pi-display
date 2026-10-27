@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -47,9 +48,13 @@ PrivateTmp=yes
 WantedBy=multi-user.target
 `
 
-// setup asks for the media source, checks it works, and installs a service
-// that starts the slideshow on every boot. Safe to re-run to change source.
-func setup(ctx context.Context) error {
+// setup gets the media source, checks it works, and installs a service that
+// starts the slideshow on every boot. Safe to re-run to change source.
+//
+// With a setup code from the web config generator it asks nothing: the code
+// carries the source, login, and slideshow settings, and the desktop is
+// turned off at boot if needed. Without one it prompts for the source.
+func setup(ctx context.Context, code string) error {
 	if os.Geteuid() != 0 {
 		return errors.New("run setup with sudo")
 	}
@@ -59,6 +64,19 @@ func setup(ctx context.Context) error {
 	}
 	in := bufio.NewReader(os.Stdin)
 
+	var device Device
+	if code != "" {
+		device, err = decodeSetupCode(code)
+	} else {
+		device, err = askSource(in)
+	}
+	if err != nil {
+		return err
+	}
+	if err := checkSource(ctx, device); err != nil {
+		return err
+	}
+
 	if _, err := exec.LookPath("mpv"); err != nil {
 		fmt.Println("Installing mpv...")
 		if err := runCmd("apt-get", "update"); err != nil {
@@ -67,11 +85,6 @@ func setup(ctx context.Context) error {
 		if err := runCmd("apt-get", "install", "-y", "mpv"); err != nil {
 			return err
 		}
-	}
-
-	device, err := askSource(ctx, in)
-	if err != nil {
-		return err
 	}
 	uid, _ := strconv.Atoi(account.Uid)
 	gid, _ := strconv.Atoi(account.Gid)
@@ -88,9 +101,13 @@ func setup(ctx context.Context) error {
 	// mpv draws straight to the display, which only works when no desktop
 	// session holds the screen.
 	if target, _ := exec.Command("systemctl", "get-default").Output(); strings.TrimSpace(string(target)) == "graphical.target" {
-		if ok, err := askYes(in, "The slideshow needs the screen, so the desktop must not start at boot. Boot to console instead? [Y/n] "); err != nil {
-			return err
-		} else if ok {
+		ok := code != ""
+		if !ok {
+			if ok, err = askYes(in, "The slideshow needs the screen, so the desktop must not start at boot. Boot to console instead? [Y/n] "); err != nil {
+				return err
+			}
+		}
+		if ok {
 			if err := runCmd("systemctl", "set-default", "multi-user.target"); err != nil {
 				return err
 			}
@@ -117,28 +134,27 @@ func serviceAccount() (*user.User, error) {
 	return user.Lookup(name)
 }
 
-func askSource(ctx context.Context, in *bufio.Reader) (Device, error) {
+// decodeSetupCode reads the base64 code the web config generator produces:
+// a Device as JSON, including its slideshow settings.
+func decodeSetupCode(code string) (Device, error) {
+	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(code))
+	if err != nil {
+		return Device{}, fmt.Errorf("setup code is not valid base64: %w", err)
+	}
+	d, err := parseDevice(data)
+	if err != nil {
+		return d, fmt.Errorf("setup code: %w", err)
+	}
+	return d, nil
+}
+
+func askSource(in *bufio.Reader) (Device, error) {
 	source, err := ask(in, "Media folder (smb://host/share/path, a public Google Drive folder link, or /local/path): ")
 	if err != nil {
 		return Device{}, err
 	}
 	d := Device{Source: source}
-
-	if isDrive(source) {
-		if _, err := parseDriveFolder(source); err != nil {
-			return d, err
-		}
-		return d, checkRemote(ctx, d)
-	}
 	if !isSMB(source) {
-		if !filepath.IsAbs(source) {
-			return d, errors.New("local folder must be an absolute path")
-		}
-		names, err := listMedia(source)
-		if err != nil {
-			return d, err
-		}
-		fmt.Printf("Found %d images and videos.\n", len(names))
 		return d, nil
 	}
 
@@ -157,7 +173,33 @@ func askSource(ctx context.Context, in *bufio.Reader) (Device, error) {
 		}
 		d.Password = string(password)
 	}
-	return d, checkRemote(ctx, d)
+	return d, nil
+}
+
+// checkSource makes sure the source is well formed and reachable, so setup
+// fails on a bad link or password instead of the service failing later.
+func checkSource(ctx context.Context, d Device) error {
+	switch {
+	case isDrive(d.Source):
+		if _, err := parseDriveFolder(d.Source); err != nil {
+			return err
+		}
+	case isSMB(d.Source):
+		if _, err := parseSMB(d.Source); err != nil {
+			return err
+		}
+	default:
+		if !filepath.IsAbs(d.Source) {
+			return errors.New("local folder must be an absolute path")
+		}
+		names, err := listMedia(d.Source)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Found %d images and videos.\n", len(names))
+		return nil
+	}
+	return checkRemote(ctx, d)
 }
 
 // checkRemote lists a remote source once so setup fails on a bad link or

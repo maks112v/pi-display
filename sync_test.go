@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -23,7 +24,7 @@ func TestMirror(t *testing.T) {
 	writeFile(t, dst, "stale.jpg", "old")
 	writeFile(t, dst, ".partial-1.jpg", "interrupted")
 
-	if err := mirror(src, dst); err != nil {
+	if err := mirror(src, dst, plentyFree); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := dirNames(t, dst), []string{"1.jpg", "clip.mp4", "display.toml"}; !slices.Equal(got, want) {
@@ -36,7 +37,7 @@ func TestMirror(t *testing.T) {
 	untouched := filepath.Join(dst, "clip.mp4")
 	before, _ := os.Stat(untouched)
 
-	if err := mirror(src, dst); err != nil {
+	if err := mirror(src, dst, plentyFree); err != nil {
 		t.Fatal(err)
 	}
 	if data, _ := os.ReadFile(filepath.Join(dst, "1.jpg")); string(data) != "one, edited" {
@@ -46,6 +47,33 @@ func TestMirror(t *testing.T) {
 		t.Error("clip.mp4 was re-downloaded")
 	}
 }
+
+func TestMirrorSkipsWhatDoesNotFit(t *testing.T) {
+	dst := t.TempDir()
+	src := fstest.MapFS{
+		"small.jpg": {Data: make([]byte, 10)},
+		"huge.mp4":  {Data: make([]byte, 100)},
+	}
+	writeFile(t, dst, "stale.jpg", "old")
+
+	// Only room for the small file. The stale file must be gone before any
+	// download is attempted, so its space counts.
+	free := func(dir string) (uint64, error) {
+		if _, err := os.Stat(filepath.Join(dir, "stale.jpg")); err == nil {
+			t.Error("free space checked before stale files were removed")
+		}
+		return diskReserve + 50, nil
+	}
+	err := mirror(src, dst, free)
+	if err == nil || !strings.Contains(err.Error(), "skipping huge.mp4") {
+		t.Errorf("err = %v, want huge.mp4 skipped", err)
+	}
+	if got, want := dirNames(t, dst), []string{"small.jpg"}; !slices.Equal(got, want) {
+		t.Errorf("dst = %v, want %v", got, want)
+	}
+}
+
+func plentyFree(string) (uint64, error) { return 1 << 40, nil }
 
 func TestParseSMB(t *testing.T) {
 	got, err := parseSMB("smb://nas.local/media/lobby/screen")

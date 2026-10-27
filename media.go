@@ -1,6 +1,8 @@
 package main
 
 import (
+	"cmp"
+	"hash/maphash"
 	"os"
 	"path/filepath"
 	"slices"
@@ -37,16 +39,58 @@ func listMedia(dir string) ([]string, error) {
 	return names, nil
 }
 
-// nextAfter picks the first name that sorts after current, wrapping to the
-// start. Deriving position from the name instead of an index means files can
-// be added or removed mid-show without any playlist bookkeeping.
-func nextAfter(names []string, current string) string {
-	for _, name := range names {
-		if naturalCompare(name, current) > 0 {
-			return name
+// playOrder decides what plays after current. Position is always derived
+// from the current file's name rather than an index, so files can be added or
+// removed mid-show without any playlist bookkeeping. Shuffled, names are
+// ordered by a seeded hash, and each pass through the folder gets a new seed.
+type playOrder struct {
+	shuffle bool
+	seed    maphash.Seed
+}
+
+func newPlayOrder() *playOrder { return &playOrder{seed: maphash.MakeSeed()} }
+
+func (o *playOrder) next(names []string, current string) string {
+	next, wrapped := nextAfter(names, current, o.compare())
+	if wrapped && o.shuffle {
+		o.seed = maphash.MakeSeed()
+		order := o.compare()
+		next, _ = nextAfter(names, "", order)
+		// Don't play the same file twice in a row across the reshuffle.
+		if next == current && len(names) > 1 {
+			next, _ = nextAfter(names, next, order)
 		}
 	}
-	return names[0]
+	return next
+}
+
+func (o *playOrder) compare() func(a, b string) int {
+	if !o.shuffle {
+		return naturalCompare
+	}
+	seed := o.seed
+	return func(a, b string) int {
+		return cmp.Or(cmp.Compare(maphash.String(seed, a), maphash.String(seed, b)), naturalCompare(a, b))
+	}
+}
+
+// nextAfter returns the first name after current in order, or the first name
+// overall when current is "". wrapped reports that nothing came after current,
+// so the show is starting over. names may be in any order.
+func nextAfter(names []string, current string, order func(a, b string) int) (next string, wrapped bool) {
+	if current != "" {
+		found := false
+		for _, name := range names {
+			if order(name, current) > 0 && (!found || order(name, next) < 0) {
+				next, found = name, true
+			}
+		}
+		if found {
+			return next, false
+		}
+		wrapped = true
+	}
+	return slices.MinFunc(names, order), wrapped
 }
 
 // naturalCompare orders names the way people number them: "2.jpg" before

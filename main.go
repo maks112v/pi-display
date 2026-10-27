@@ -2,10 +2,11 @@
 // and videos in a folder, either local or mirrored from an SMB share or a
 // public Google Drive folder.
 //
-//	sudo pi-display setup   # one-time: pick the source, install the boot service
-//	pi-display run          # what the service runs
-//	pi-display on [2h]      # stay on outside the schedule for a while (0 cancels)
-//	sudo pi-display update  # install the latest release and restart
+//	sudo pi-display setup [code]  # one-time: pick the source, install the boot service
+//	                              # (code comes from the web config generator and skips the prompts)
+//	pi-display run                # what the service runs
+//	pi-display on [2h]            # stay on outside the schedule for a while (0 cancels)
+//	sudo pi-display update        # install the latest release and restart
 //	pi-display version
 package main
 
@@ -13,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -30,7 +32,7 @@ func main() {
 	case "run":
 		err = run(ctx)
 	case "setup":
-		err = setup(ctx)
+		err = setup(ctx, argAt(2))
 	case "on":
 		err = keepOn(wakePath, argAt(2))
 	case "update":
@@ -38,7 +40,7 @@ func main() {
 	case "version":
 		fmt.Println(version)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: pi-display <setup|run|on [duration]|update|version>")
+		fmt.Fprintln(os.Stderr, "usage: pi-display <setup [code]|run|on [duration]|update|version>")
 		os.Exit(2)
 	}
 	if err != nil && !errors.Is(err, context.Canceled) {
@@ -68,7 +70,15 @@ func run(ctx context.Context) error {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
-		go syncLoop(ctx, device, dir)
+		// SMB folders also collect each screen's log, so problems across
+		// screens can be read from the share without SSH.
+		var logs *shareLog
+		if isSMB(device.Source) {
+			host, _ := os.Hostname()
+			logs = newShareLog(host)
+			log.SetOutput(io.MultiWriter(os.Stderr, logs))
+		}
+		go syncLoop(ctx, device, dir, logs)
 	}
 
 	player, err := startMPV(ctx, socketPath)
@@ -77,5 +87,5 @@ func run(ctx context.Context) error {
 	}
 	defer player.close()
 
-	return play(ctx, player, dir)
+	return play(ctx, player, dir, device.baseShow())
 }
