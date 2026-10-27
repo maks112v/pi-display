@@ -30,4 +30,4 @@ Plug the Pi into the display and power it on. Once it has booted, SSH in as the 
 ssh pi@raspberrypi.local
 ```
 
-Replace `pi` and `raspberrypi` with the username and hostname you chose. Next, [install pi-display](/docs/install).
+Replace `pi` and `raspberrypi` with the username and hostname you chose. Next, [install Pi Display](/docs/install).

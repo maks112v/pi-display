@@ -1,6 +1,6 @@
 ---
 title: Commands
-description: Everything pi-display can do from the command line.
+description: Everything Pi Display can do from the command line.
 ---
 
 Run these over SSH on the Pi.

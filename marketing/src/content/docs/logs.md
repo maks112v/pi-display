@@ -5,7 +5,7 @@ description: See what a screen is doing, on the Pi or from the share.
 
 ## On the Pi
 
-pi-display logs to the system journal. Over SSH, run:
+Pi Display logs to the system journal. Over SSH, run:
 
 ```sh
 pi-display logs

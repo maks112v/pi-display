@@ -1,6 +1,6 @@
 ---
 title: Install
-description: Download the latest pi-display release onto the Pi.
+description: Download the latest Pi Display release onto the Pi.
 ---
 
 On the Pi, run:

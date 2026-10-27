@@ -30,6 +30,17 @@ const steps = [
   },
 ];
 
+// Boards Pi Display targets. "possible" means it should work but hasn't been tested.
+const boards = [
+  { name: "Raspberry Pi 5", status: "supported", body: "The fastest option. Runs the 64-bit build." },
+  { name: "Raspberry Pi 4", status: "supported", body: "Runs the 64-bit build. A good fit for most screens." },
+  {
+    name: "Raspberry Pi Zero 2 W",
+    status: "possible",
+    body: "Should run the same 64-bit build, but it's untested. Its 512 MB of memory may struggle with large videos.",
+  },
+] as const;
+
 const features = [
   { label: "Starts playing when the TV powers on", detail: "systemd service" },
   { label: "Keeps playing if the network drops", detail: "local copy, synced every 30s" },
@@ -40,7 +51,7 @@ const features = [
 ---
 
 <Layout
-  title="pi-display: simple digital signage for any TV"
+  title="Pi Display: simple digital signage for any TV"
   description="Put images and videos in a shared folder. Every Raspberry Pi connected to it plays them full screen, in order, from the moment it powers on."
 >
   <section class="flex flex-col items-center gap-6 pt-24 pb-20 text-center sm:pt-30">
@@ -109,13 +120,34 @@ const features = [
     </ul>
   </section>
 
-  <section class="flex flex-col justify-between gap-6 pt-30 sm:flex-row sm:items-center">
+  <section id="hardware" class="flex scroll-mt-8 flex-col gap-10 pt-30">
     <div class="flex flex-col gap-2">
-      <h2 class="text-[28px] font-semibold tracking-[-0.02em]">Set up your first screen</h2>
-      <p class="text-[15px] text-muted">Takes about five minutes.</p>
+      <h2 class="text-[28px] font-semibold tracking-[-0.02em]">Supported hardware</h2>
+      <p class="text-[15px] text-muted">Any of these, running Raspberry Pi OS Lite (64-bit), plus a TV with HDMI.</p>
     </div>
-    <div class="flex gap-3">
-      <a href="/config" class={button.primary}>Open config generator</a>
+    <ul class="grid gap-12 md:grid-cols-3">
+      {
+        boards.map((board) => (
+          <li class="flex flex-col gap-2.5 border-t border-edge pt-5">
+            <span class="flex items-center gap-2 text-sm text-muted">
+              <span class:list={["size-1.5 rounded-full", board.status === "supported" ? "bg-live" : "bg-accent"]} />
+              {board.status === "supported" ? "Supported" : "Possible"}
+            </span>
+            <h3 class="text-[17px] font-semibold">{board.name}</h3>
+            <p class="text-[15px] leading-6 text-muted">{board.body}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="flex flex-col items-center gap-6 pt-40 text-center">
+    <h2 class="text-4xl leading-tight font-semibold tracking-[-0.03em] sm:text-[56px] sm:leading-16">
+      Set up your first screen
+    </h2>
+    <p class="text-lg leading-7 text-muted">Takes about five minutes.</p>
+    <div class="flex gap-3 pt-3">
+      <a href="/install" class={button.primary}>Install Pi Display</a>
       <a href="/docs" class={button.secondary}>Read the docs</a>
     </div>
   </section>

@@ -30,4 +30,4 @@ Like [SMB shares](/docs/smb), the folder is mirrored onto the Pi every 30 second
 - Only files at the top of the folder are used. Subfolders are skipped.
 - Native Google Docs, Sheets, and Slides are ignored. Export slides as images first.
 - If two files share a name, the first one Drive lists wins.
-- pi-display reads Drive's public folder page and download links, not an official API. If Google changes those pages, Drive sources can break until pi-display is updated.
+- Pi Display reads Drive's public folder page and download links, not an official API. If Google changes those pages, Drive sources can break until Pi Display is updated.

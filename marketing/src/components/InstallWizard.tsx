@@ -2,14 +2,14 @@ import { useState, type ReactNode } from "react";
 import { defaultSource, installCommand, normalizeSource, setupCommand, type SourceKind, type SourceSettings } from "../lib/setup";
 import { CopyButton, Explain, Field, Output, Wizard, input, primaryButton, useWizard, type WizardStep } from "./wizard";
 
-// The install page: download pi-display, pick the media source, run setup.
+// The install page: download Pi Display, pick the media source, run setup.
 // Playback settings live on the config page, which the last step links to.
 // Nothing leaves the browser: the command is computed from local state.
 export default function InstallWizard() {
   const [settings, setSettings] = useState<SourceSettings>(defaultSource);
   const update = (patch: Partial<SourceSettings>) => setSettings((s) => ({ ...s, ...patch }));
   const wizard = useWizard();
-  const { step, go } = wizard;
+  const { step } = wizard;
 
   const source = normalizeSource(settings.kind, settings.source);
   const command = setupCommand(settings);
@@ -19,7 +19,7 @@ export default function InstallWizard() {
   const steps: WizardStep[] = [
     {
       label: "Install",
-      title: "Install pi-display",
+      title: "Install Pi Display",
       description: "SSH into the Pi and run these two commands. New Pi? Flash Raspberry Pi OS Lite with SSH turned on first.",
     },
     {
@@ -43,17 +43,8 @@ export default function InstallWizard() {
       canOpen={(i) => i <= 1 || source !== null}
       canLeave={step !== 1 || source !== null}
       footer={
-        step === 0 ? (
-          <>
-            <button type="button" className="text-sm text-muted hover:text-fg" onClick={() => go(1)}>
-              Already installed? Skip
-            </button>
-            <button type="submit" className={primaryButton}>
-              Continue
-            </button>
-          </>
-        ) : step === 1 ? (
-          <button type="submit" disabled={source === null} className={primaryButton}>
+        step < 2 ? (
+          <button type="submit" disabled={step === 1 && source === null} className={primaryButton}>
             Continue
           </button>
         ) : (

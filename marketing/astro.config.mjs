@@ -6,6 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 const codeLabels = { sh: "Terminal", toml: "TOML" };
 
 export default defineConfig({
+  site: "https://pi-display-five.vercel.app",
   integrations: [react()],
   vite: { plugins: [tailwindcss()] },
   markdown: {

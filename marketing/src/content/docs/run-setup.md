@@ -1,9 +1,9 @@
 ---
 title: Run setup
-description: Point pi-display at your media folder and start the slideshow on every boot.
+description: Point Pi Display at your media folder and start the slideshow on every boot.
 ---
 
-From the folder you downloaded pi-display into, run:
+From the folder you downloaded Pi Display into, run:
 
 ```sh
 sudo ./pi-display setup
@@ -18,6 +18,7 @@ Run it with `sudo` from your normal user, not as root. The slideshow runs as tha
 3. Installs mpv, the video player, if it is missing.
 4. Installs itself to `/usr/local/bin/pi-display` and adds a service that starts the slideshow on every boot. You can delete the downloaded `./pi-display` afterwards.
 5. If the Pi boots to a desktop, offers to boot to the console instead. Say yes: the slideshow needs the screen to itself.
+6. If the Pi has the boot splash (the desktop image does), sets the boot logo to the Pi Display icon. On Raspberry Pi OS Lite this step is skipped.
 
 The slideshow starts as soon as setup finishes.
 

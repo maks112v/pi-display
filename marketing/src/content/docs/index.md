@@ -3,7 +3,7 @@ title: Introduction
 description: Turn a Raspberry Pi into a full-screen slideshow of every image and video in a folder.
 ---
 
-pi-display plays every image and video in a folder, full screen, in filename order. The folder can be an SMB share on your network, a public Google Drive folder, or a folder on the Pi itself. The Pi boots straight into the slideshow whenever it gets power.
+Pi Display plays every image and video in a folder, full screen, in filename order. The folder can be an SMB share on your network, a public Google Drive folder, or a folder on the Pi itself. The Pi boots straight into the slideshow whenever it gets power.
 
 ## How it fits together
 
@@ -18,5 +18,5 @@ The quickest way is the [install page](/install): it walks through installing an
 To do it by hand, follow these pages in order:
 
 1. [Prepare the Pi](/docs/prepare-the-pi): flash the SD card.
-2. [Install](/docs/install): download pi-display.
+2. [Install](/docs/install): download Pi Display.
 3. [Run setup](/docs/run-setup): point it at your folder.

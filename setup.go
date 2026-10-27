@@ -33,7 +33,7 @@ const (
 // Plymouth holds the screen loses it when the splash exits, leaving the
 // console showing.
 const unitTemplate = `[Unit]
-Description=pi-display slideshow
+Description=Pi Display slideshow
 After=local-fs.target plymouth-quit-wait.service
 
 [Service]
@@ -144,6 +144,10 @@ func setup(ctx context.Context, code string) error {
 		if err := runCmd("systemctl", args...); err != nil {
 			return err
 		}
+	}
+	// The boot logo is cosmetic, so a failure here doesn't fail setup.
+	if err := installSplash(); err != nil {
+		fmt.Println("Skipped the boot logo:", err)
 	}
 	fmt.Println("Done. The slideshow is starting now and on every boot. Logs: pi-display logs")
 

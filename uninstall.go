@@ -11,9 +11,9 @@ import (
 )
 
 // uninstall undoes setup: it removes the service, the program, its settings
-// (including any SMB password), and the mirrored media. Setup may also have
-// turned off the desktop and installed mpv, but it doesn't record whether it
-// did, so those are offered rather than done unasked.
+// (including any SMB password), the mirrored media, and the boot logo. Setup
+// may also have turned off the desktop and installed mpv, but it doesn't
+// record whether it did, so those are offered rather than done unasked.
 func uninstall() error {
 	if os.Geteuid() != 0 {
 		return errors.New("run uninstall with sudo")
@@ -36,6 +36,9 @@ func uninstall() error {
 		return err
 	}
 	fmt.Println("Removed the service, program, settings, and mirrored media.")
+	if err := removeSplash(); err != nil {
+		fmt.Println("Couldn't restore the boot logo:", err)
+	}
 
 	// A display manager on a console-boot Pi means the desktop is installed
 	// but switched off, most likely by setup.

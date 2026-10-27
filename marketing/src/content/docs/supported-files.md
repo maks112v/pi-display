@@ -36,4 +36,4 @@ The folder is re-read before every file, so changes show up at the next slide, p
 
 ## Playback
 
-[mpv](https://mpv.io) decodes everything and draws straight to the screen with hardware decoding. pi-display decides what plays and for how long.
+[mpv](https://mpv.io) decodes everything and draws straight to the screen with hardware decoding. Pi Display decides what plays and for how long.

@@ -1,6 +1,6 @@
 ---
 title: Uninstall
-description: Remove pi-display and everything it added to the Pi.
+description: Remove Pi Display and everything it added to the Pi.
 ---
 
 Over SSH on the Pi, run:
@@ -9,7 +9,7 @@ Over SSH on the Pi, run:
 sudo pi-display uninstall
 ```
 
-This stops the slideshow and removes the service, the program, its settings, and the mirrored media. If the Pi has a desktop that is switched off, it asks whether to turn it back on. If mpv is installed, it asks whether to remove it too.
+This stops the slideshow and removes the service, the program, its settings, and the mirrored media. If setup set the boot logo, it puts the Raspberry Pi one back. If the Pi has a desktop that is switched off, it asks whether to turn it back on. If mpv is installed, it asks whether to remove it too.
 
 > The `uninstall` command arrived in v0.0.5. On an older release, run `sudo pi-display update` first, or use the manual steps below.
 
@@ -31,6 +31,15 @@ sudo rm -rf /etc/pi-display /var/lib/pi-display
 ```
 
 > `/etc/pi-display` holds the SMB password. Removing it is the step that takes the login off the Pi.
+
+### Boot logo
+
+If setup set the boot logo, put the Raspberry Pi one back and remove the theme. This rebuilds the initramfs, which takes a minute:
+
+```sh
+sudo plymouth-set-default-theme -R pix
+sudo rm -rf /usr/share/plymouth/themes/pi-display
+```
 
 ### Optional cleanup
 

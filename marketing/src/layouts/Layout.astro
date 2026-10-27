@@ -1,6 +1,8 @@
 ---
 // Shared page shell: document head, nav, and the centered content column.
 import "../styles/global.css";
+import Logo from "../components/Logo.astro";
+import ShareMeta from "../components/ShareMeta.astro";
 
 interface Props {
   title: string;
@@ -24,26 +26,24 @@ const links = [
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
+    <ShareMeta title={title} description={description} />
   </head>
   <body class="bg-bg font-sans text-fg antialiased">
     <div class="mx-auto max-w-[1168px] px-6 pb-24">
       <nav class="flex items-center justify-between gap-6 border-b border-line py-5">
         <a href="/" class="flex items-center gap-2.5 font-semibold">
-          <svg width="20" height="16" viewBox="0 0 20 16" fill="none" aria-hidden="true">
-            <rect x="1" y="1" width="18" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5"></rect>
-            <path d="M7 15 H13" stroke="currentColor" stroke-width="1.5"></path>
-          </svg>
-          pi-display
+          <Logo />
+          Pi Display
         </a>
         <div class="flex items-center gap-8">
           <div class="hidden items-center gap-8 text-sm text-muted md:flex">
             {links.map((link) => <a href={link.href} class="hover:text-fg">{link.label}</a>)}
           </div>
           <div class="flex items-center gap-2.5 text-sm">
-            <a href="/config" class="flex h-9 items-center rounded-md bg-accent px-3.5 font-semibold text-bg hover:bg-accent/85">
+            <a href="/config" class="flex h-9 items-center rounded-md border border-edge px-3.5 font-medium hover:border-muted">
               Config generator
             </a>
-            <a href="/install" class="flex h-9 items-center rounded-md border border-edge px-3.5 font-medium hover:border-muted">
+            <a href="/install" class="flex h-9 items-center rounded-md bg-accent px-3.5 font-semibold text-bg hover:bg-accent/85">
               Install
             </a>
           </div>

@@ -1,4 +1,4 @@
-# pi-display
+# Pi Display
 
 Turns a Raspberry Pi into a full-screen slideshow of every image and video in a folder, played in filename order. The folder can be local, on an SMB share, or a public Google Drive folder. The Pi boots straight into the slideshow whenever it gets power.
 
@@ -13,7 +13,7 @@ Flash an SD card with [Raspberry Pi Imager](https://www.raspberrypi.com/software
 
 Plug the Pi into the display, boot it, and SSH in as the user you created.
 
-### 2. Download pi-display
+### 2. Download Pi Display
 
 ```sh
 curl -fsSLo pi-display "https://github.com/maks112v/pi-display/releases/latest/download/pi-display-$(dpkg --print-architecture)"
@@ -38,6 +38,7 @@ Run it with `sudo` from your normal user, not as root. The slideshow runs as tha
 3. Installs mpv if it is missing.
 4. Installs itself to `/usr/local/bin/pi-display` and adds a service that starts the slideshow on every boot. You can delete the downloaded `./pi-display` afterwards.
 5. If the Pi boots to a desktop, offers to boot to console instead. Say yes: the slideshow needs the screen to itself.
+6. If the Pi has the boot splash (the desktop image does), sets the boot logo to the Pi Display icon. On Raspberry Pi OS Lite this step is skipped.
 
 To skip the questions, use the install page on the website and run the command it gives you: `sudo ./pi-display setup <code>`. The code carries the folder and login, and setup turns the desktop off at boot without asking. It includes the password encoded, not encrypted, so treat it like the password.
 
@@ -55,7 +56,7 @@ pi-display logs              # watch the logs (journalctl -u pi-display -f)
 pi-display version           # show the installed release
 sudo pi-display update       # install the latest release, keeping your settings
 sudo pi-display config <code> # apply slideshow settings from the config generator to this Pi only
-sudo pi-display uninstall    # remove pi-display and everything setup added
+sudo pi-display uninstall    # remove Pi Display and everything setup added
 pi-display on 2h             # stay on outside the schedule (see below)
 ```
 
@@ -140,3 +141,4 @@ It takes effect within 5 seconds and survives a reboot. Schedule changes and exp
 | `/etc/systemd/system/pi-display.service` | Boot service |
 | `/var/lib/pi-display/media` | Mirrored SMB or Drive files |
 | `/var/lib/pi-display/awake-until` | End time of a `pi-display on` override |
+| `/usr/share/plymouth/themes/pi-display` | Boot logo theme, if Plymouth is installed |

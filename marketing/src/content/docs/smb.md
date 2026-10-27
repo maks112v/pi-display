@@ -25,7 +25,7 @@ Setup asks for a username and password. Leave the username blank for a guest sha
 
 Use an account that can read the folder. If it can also write, each screen keeps its [log file](/docs/logs) in the share, so you can check every screen without SSH.
 
-> pi-display speaks SMB 2 and 3, which every current NAS and Windows version supports. Very old devices that only speak SMB 1 won't connect.
+> Pi Display speaks SMB 2 and 3, which every current NAS and Windows version supports. Very old devices that only speak SMB 1 won't connect.
 
 ## Syncing
 
