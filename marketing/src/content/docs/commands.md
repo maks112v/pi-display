@@ -3,7 +3,7 @@ title: Commands
 description: Everything Pi Display can do from the command line.
 ---
 
-Run these over SSH on the Pi.
+Run these over SSH on the Pi. With no network, plug a keyboard into the Pi and press Ctrl+Alt+T to get a console. See [Fixing a Pi on site](/docs/on-site).
 
 | Command | What it does |
 | --- | --- |

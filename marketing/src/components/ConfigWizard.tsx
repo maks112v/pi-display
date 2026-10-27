@@ -165,11 +165,16 @@ export default function ConfigWizard() {
         <div className="flex flex-col gap-8">
           <ScheduleEditor value={settings.schedule} onChange={(schedule) => update({ schedule })} />
           {settings.schedule.mode !== "always" && (
-            <Switch
-              label="Turn the TV off and on over HDMI-CEC"
-              checked={settings.tvPower}
-              onChange={(tvPower) => update({ tvPower })}
-            />
+            <div className="flex flex-col gap-3">
+              <Switch
+                label="Turn the TV off and on over HDMI-CEC"
+                checked={settings.tvPower}
+                onChange={(tvPower) => update({ tvPower })}
+              />
+              <p className="text-[13px] leading-5 text-faint">
+                Power the Pi from its own adapter, not the TV's USB port. If the TV powers the Pi, turning the TV off shuts the Pi down and it can't turn the TV back on.
+              </p>
+            </div>
           )}
         </div>
       )}

@@ -1,5 +1,7 @@
 ---
 import HeroFlow from "../components/HeroFlow.astro";
+import HowItWorks from "../components/HowItWorks.astro";
+import SupportedHardware from "../components/SupportedHardware.astro";
 import Layout from "../layouts/Layout.astro";
 
 const repo = "https://github.com/maks112v/pi-display";
@@ -15,39 +17,14 @@ const formats = [
   ...["MP4", "MOV", "MKV", "WebM", "M4V", "AVI"].map((name) => ({ name, kind: "video" })),
 ];
 
-const steps = [
-  {
-    title: "Connect a Pi to the TV",
-    body: "Any Raspberry Pi running Raspberry Pi OS Lite. Plug it into HDMI and power.",
-  },
-  {
-    title: "Run one setup command",
-    body: "Generate it on this site with your share and login. Paste it on the Pi.",
-  },
-  {
-    title: "Add files to the folder",
-    body: "Screens pick up changes within a slide. Rename files to change the order.",
-  },
-];
-
-// Boards Pi Display targets. "possible" means it should work but hasn't been tested.
-const boards = [
-  { name: "Raspberry Pi 5", status: "supported", body: "The fastest option. Runs the 64-bit build." },
-  { name: "Raspberry Pi 4", status: "supported", body: "Runs the 64-bit build. A good fit for most screens." },
-  {
-    name: "Raspberry Pi Zero 2 W",
-    status: "possible",
-    body: "Should run the same 64-bit build, but it's untested. Its 512 MB of memory may struggle with large videos.",
-  },
-] as const;
-
+// Each icon is drawn inline in the "Built to run unattended" section below.
 const features = [
-  { label: "Starts playing when the TV powers on", detail: "systemd service" },
-  { label: "Keeps playing if the network drops", detail: "local copy, synced every 30s" },
-  { label: "Images and video, smooth on a Pi", detail: "hardware decoding" },
-  { label: "Per-slide timing and fit", detail: "display.toml" },
-  { label: "No accounts, apps or subscriptions", detail: "open source" },
-];
+  { label: "Starts playing when the TV powers on", detail: "systemd service", icon: "power" },
+  { label: "Keeps playing if the network drops", detail: "local copy, every 30s", icon: "offline" },
+  { label: "Images and video, smooth on a Pi", detail: "hardware decoding", icon: "video" },
+  { label: "Per-slide timing and fit", detail: "display.toml", icon: "sliders" },
+  { label: "No accounts, apps or subscriptions", detail: "open source", icon: "unlocked" },
+] as const;
 ---
 
 <Layout
@@ -91,55 +68,70 @@ const features = [
     </ul>
   </section>
 
-  <section id="how-it-works" class="flex scroll-mt-8 flex-col gap-10 pt-30">
-    <h2 class="text-[28px] font-semibold tracking-[-0.02em]">How it works</h2>
-    <ol class="grid gap-12 md:grid-cols-3">
-      {
-        steps.map((step, i) => (
-          <li class="flex flex-col gap-2.5 border-t border-edge pt-5">
-            <span class="text-sm text-faint">{i + 1}</span>
-            <h3 class="text-[17px] font-semibold">{step.title}</h3>
-            <p class="text-[15px] leading-6 text-muted">{step.body}</p>
-          </li>
-        ))
-      }
-    </ol>
-  </section>
+  <HowItWorks />
 
-  <section class="grid gap-8 pt-30 md:grid-cols-3 md:gap-12">
-    <h2 class="text-[28px] font-semibold tracking-[-0.02em]">Built to run unattended</h2>
-    <ul class="border-b border-line text-[15px] md:col-span-2">
+  <section class="flex flex-col gap-12 pt-30">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-12">
+      <h2 class="text-[32px] leading-10 font-semibold tracking-[-0.03em] sm:text-[40px] sm:leading-12">
+        Built to run unattended
+      </h2>
+      <p class="max-w-[340px] text-[15px] leading-6 text-muted">
+        Set it up once. It keeps the screen going through reboots, outages, and new files.
+      </p>
+    </div>
+    <ul class="grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-5 lg:gap-0 lg:border-t lg:border-line">
       {
         features.map((feature) => (
-          <li class="flex justify-between gap-6 border-t border-line py-4">
-            <span>{feature.label}</span>
-            <span class="text-right text-faint">{feature.detail}</span>
+          <li class="flex flex-col gap-3.5 border-t border-line pt-7 lg:border-t-0 lg:px-6 lg:first:pl-0 lg:last:pr-0 lg:not-first:border-l">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              {feature.icon === "power" && <path d="M12 3 V11 M6.5 6.5 A7.5 7.5 0 1 0 17.5 6.5" />}
+              {feature.icon === "offline" && (
+                <>
+                  <path d="M2.5 9 A14 14 0 0 1 21.5 9 M6 12.5 A9 9 0 0 1 18 12.5 M9.5 16 A4 4 0 0 1 14.5 16" />
+                  <circle cx="12" cy="19.5" r="1" fill="currentColor" />
+                  <path d="M3 3 L21 21" class="text-accent" />
+                </>
+              )}
+              {feature.icon === "video" && (
+                <>
+                  <rect x="2.5" y="4.5" width="19" height="15" rx="2" />
+                  <path d="M10 9 L15 12 L10 15 Z" fill="currentColor" />
+                </>
+              )}
+              {feature.icon === "sliders" && (
+                <>
+                  <path d="M4 6 H20 M4 12 H20 M4 18 H20" />
+                  <circle cx="9" cy="6" r="2" class="fill-bg" />
+                  <circle cx="15" cy="12" r="2" class="fill-bg" />
+                  <circle cx="7" cy="18" r="2" class="fill-bg" />
+                </>
+              )}
+              {feature.icon === "unlocked" && (
+                <>
+                  <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+                  <path d="M8 10.5 V7.5 A4 4 0 0 1 15.5 5.5" />
+                </>
+              )}
+            </svg>
+            <h3 class="text-[17px] leading-6 font-semibold lg:min-h-12">{feature.label}</h3>
+            <p class="font-mono text-xs text-muted">{feature.detail}</p>
           </li>
         ))
       }
     </ul>
   </section>
 
-  <section id="hardware" class="flex scroll-mt-8 flex-col gap-10 pt-30">
-    <div class="flex flex-col gap-2">
-      <h2 class="text-[28px] font-semibold tracking-[-0.02em]">Supported hardware</h2>
-      <p class="text-[15px] text-muted">Any of these, running Raspberry Pi OS Lite (64-bit), plus a TV with HDMI.</p>
-    </div>
-    <ul class="grid gap-12 md:grid-cols-3">
-      {
-        boards.map((board) => (
-          <li class="flex flex-col gap-2.5 border-t border-edge pt-5">
-            <span class="flex items-center gap-2 text-sm text-muted">
-              <span class:list={["size-1.5 rounded-full", board.status === "supported" ? "bg-live" : "bg-accent"]} />
-              {board.status === "supported" ? "Supported" : "Possible"}
-            </span>
-            <h3 class="text-[17px] font-semibold">{board.name}</h3>
-            <p class="text-[15px] leading-6 text-muted">{board.body}</p>
-          </li>
-        ))
-      }
-    </ul>
-  </section>
+  <SupportedHardware />
 
   <section class="flex flex-col items-center gap-6 pt-40 text-center">
     <h2 class="text-4xl leading-tight font-semibold tracking-[-0.03em] sm:text-[56px] sm:leading-16">

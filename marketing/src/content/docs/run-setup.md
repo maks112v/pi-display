@@ -15,9 +15,9 @@ Run it with `sudo` from your normal user, not as root. The slideshow runs as tha
 
 1. Asks for the media folder: an [SMB share](/docs/smb), a [Google Drive folder](/docs/google-drive), or a [local folder](/docs/local-folder).
 2. Connects and reports how many images and videos it found. A wrong link or password stops setup here.
-3. Installs mpv, the video player, if it is missing.
+3. Installs mpv, the video player, and v4l-utils, which turns the TV off and on with the [schedule](/docs/schedules), if they are missing.
 4. Installs itself to `/usr/local/bin/pi-display` and adds a service that starts the slideshow on every boot. You can delete the downloaded `./pi-display` afterwards.
-5. If the Pi boots to a desktop, offers to boot to the console instead. Say yes: the slideshow needs the screen to itself.
+5. If the Pi boots to a desktop, offers to boot to the console instead. Say yes: the slideshow needs the screen to itself. You can still open the desktop later with `sudo pi-display desktop`. See [Fixing a Pi on site](/docs/on-site#the-desktop).
 6. If the Pi has the boot splash (the desktop image does), sets the boot logo to the Pi Display icon. On Raspberry Pi OS Lite this step is skipped.
 
 The slideshow starts as soon as setup finishes.

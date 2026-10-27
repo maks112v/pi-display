@@ -1,0 +1,138 @@
+---
+// Homepage "Supported hardware": each board drawn to relative scale on a shared
+// baseline, with status, a note, and a small spec table underneath. "possible"
+// boards get a dashed outline and a yellow LED.
+
+type Board = {
+  name: string;
+  status: "supported" | "possible";
+  body: string;
+  specs: [label: string, value: string][];
+  drawing: "pi5" | "pi4" | "zero";
+};
+
+const boards: Board[] = [
+  {
+    name: "Raspberry Pi 5",
+    status: "supported",
+    body: "The fastest option. Runs the 64-bit build.",
+    specs: [
+      ["memory", "2 to 16 GB"],
+      ["video out", "2× micro-HDMI"],
+    ],
+    drawing: "pi5",
+  },
+  {
+    name: "Raspberry Pi 4",
+    status: "supported",
+    body: "Runs the 64-bit build. A good fit for most screens.",
+    specs: [
+      ["memory", "1 to 8 GB"],
+      ["video out", "2× micro-HDMI"],
+    ],
+    drawing: "pi4",
+  },
+  {
+    name: "Raspberry Pi Zero 2 W",
+    status: "possible",
+    body: "Should run the same 64-bit build. Large videos may be too much for its memory.",
+    specs: [
+      ["memory", "512 MB"],
+      ["video out", "mini-HDMI"],
+    ],
+    drawing: "zero",
+  },
+];
+
+// Inner padding per column so drawings and text share a left edge on lg.
+const columnPadding = ["lg:pr-10", "lg:px-10", "lg:pl-10"];
+---
+
+<section id="hardware" class="flex scroll-mt-8 flex-col gap-14 pt-30">
+  <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <h2 class="text-[32px] leading-10 font-semibold tracking-[-0.03em] sm:text-[40px] sm:leading-12">
+      Supported hardware
+    </h2>
+    <span class="font-mono text-[13px] text-muted">Raspberry Pi OS Lite (64-bit) · any HDMI TV</span>
+  </div>
+
+  <ul class="grid gap-14 lg:grid-cols-3 lg:gap-0">
+    {
+      boards.map((board, i) => (
+        <li class="flex flex-col">
+          <div class:list={["flex items-end border-b border-edge pb-6 lg:h-[158px]", columnPadding[i]]} aria-hidden="true">
+            {board.drawing === "zero" ? (
+              <svg width="158" height="74" viewBox="0 0 158 74" fill="none" class="max-w-full">
+                <rect x="0.75" y="0.75" width="155.5" height="71.5" rx="6" fill="#0d0d0d" stroke="#aaa" stroke-width="1.5" stroke-dasharray="5 4" />
+                <g fill="#444">
+                  {Array.from({ length: 18 }, (_, d) => (
+                    <>
+                      <circle cx={20 + d * 7} cy="8" r="1.4" />
+                      <circle cx={20 + d * 7} cy="15" r="1.4" />
+                    </>
+                  ))}
+                </g>
+                <g stroke="#555" stroke-width="1.2">
+                  <rect x="60" y="28" width="32" height="32" rx="3" fill="#1a1a1a" />
+                  <rect x="18" y="62" width="22" height="10" rx="2" fill="#000" />
+                  <rect x="96" y="64" width="14" height="8" rx="2" fill="#000" />
+                  <rect x="118" y="64" width="14" height="8" rx="2" fill="#000" />
+                </g>
+                <circle cx="146" cy="50" r="2.2" fill="#ffd400" />
+              </svg>
+            ) : (
+              <svg width="214" height="134" viewBox="0 0 214 134" fill="none" class="max-w-full">
+                <rect x="0.75" y="0.75" width="202.5" height="132.5" rx="8" fill="#0d0d0d" stroke="#fff" stroke-width="1.5" />
+                <g fill="#555">
+                  {Array.from({ length: 15 }, (_, d) => (
+                    <>
+                      <circle cx={20 + d * 8} cy="9" r="1.5" />
+                      <circle cx={20 + d * 8} cy="17" r="1.5" />
+                    </>
+                  ))}
+                </g>
+                <g stroke="#555" stroke-width="1.2">
+                  {board.drawing === "pi5" ? (
+                    <>
+                      <rect x="56" y="46" width="44" height="44" rx="3" fill="#1a1a1a" />
+                      <rect x="112" y="56" width="24" height="24" rx="2" stroke="#333" />
+                    </>
+                  ) : (
+                    <>
+                      <rect x="62" y="50" width="38" height="38" rx="3" fill="#1a1a1a" />
+                      <rect x="112" y="40" width="20" height="28" rx="2" stroke="#333" />
+                    </>
+                  )}
+                  <rect x="164" y="10" width="49" height="35" rx="2" fill="#000" />
+                  <rect x="164" y="51" width="49" height="34" rx="2" fill="#000" />
+                  <rect x="164" y="91" width="49" height="35" rx="2" fill="#000" />
+                  <rect x="18" y="122" width="18" height="12" rx="2" fill="#000" />
+                  <rect x="48" y="122" width="16" height="12" rx="2" fill="#000" />
+                  <rect x="74" y="122" width="16" height="12" rx="2" fill="#000" />
+                </g>
+                <circle cx="16" cy="104" r="2.5" fill="#3ddc84" />
+              </svg>
+            )}
+          </div>
+
+          <div class:list={["flex flex-1 flex-col gap-2.5 pt-8", columnPadding[i]]}>
+            <span class="flex items-center gap-2 text-sm text-muted">
+              <span class:list={["size-1.5 rounded-full", board.status === "supported" ? "bg-live" : "bg-accent"]} />
+              {board.status === "supported" ? "Supported" : "Possible, untested"}
+            </span>
+            <h3 class="text-[22px] leading-7 font-semibold tracking-[-0.015em]">{board.name}</h3>
+            <p class="text-[15px] leading-6 text-muted lg:min-h-12">{board.body}</p>
+            <dl class="mt-2 border-b border-line font-mono text-xs leading-[18px]">
+              {board.specs.map(([label, value]) => (
+                <div class="flex justify-between gap-4 border-t border-line py-2">
+                  <dt class="text-faint">{label}</dt>
+                  <dd>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </li>
+      ))
+    }
+  </ul>
+</section>

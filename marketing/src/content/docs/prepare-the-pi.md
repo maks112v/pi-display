@@ -16,7 +16,7 @@ Pick **Raspberry Pi OS Lite (64-bit)**, Trixie or newer. Lite has no desktop, wh
 Before writing the card, open the customisation settings and:
 
 - set a username and password
-- add your Wi-Fi network if the Pi is not on Ethernet
+- add your Wi-Fi network if the Pi is not on Ethernet. If it changes later, see [Fixing a Pi on site](/docs/on-site).
 - set your timezone, so [schedules](/docs/schedules) match the wall clock
 - turn on SSH
 

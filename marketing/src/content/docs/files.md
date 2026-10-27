@@ -12,4 +12,4 @@ description: Where Pi Display keeps its program, settings, and media.
 | `/var/lib/pi-display/override` | A `pi-display on` or `off` override and when it ends |
 | `/usr/share/plymouth/themes/pi-display` | The boot logo, on Pis with the boot splash |
 
-Setup also installs `mpv` with apt, and may switch the Pi to boot to the console instead of a desktop. [Uninstall](/docs/uninstall) covers undoing both.
+Setup also installs `mpv` and `v4l-utils` (for HDMI-CEC TV control) with apt, and may switch the Pi to boot to the console instead of a desktop. [Uninstall](/docs/uninstall) covers undoing both.

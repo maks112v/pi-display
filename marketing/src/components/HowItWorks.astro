@@ -1,0 +1,167 @@
+---
+// Homepage "How it works": three steps down a numbered rail, each with a line
+// illustration. On lg the illustration sits right of the text; below lg it
+// stacks under it.
+
+const steps = [
+  {
+    title: "Connect a Pi to the TV",
+    body: "Any Raspberry Pi running Raspberry Pi OS Lite. Plug it into HDMI and power.",
+  },
+  {
+    title: "Run one setup command",
+    body: "Generate it on this site with your share and login. Paste it on the Pi.",
+  },
+  {
+    title: "Add files to the folder",
+    body: "Screens pick up changes within a slide. Rename files to change the order.",
+  },
+];
+
+const files = [
+  { name: "01-welcome.png", kind: "image" },
+  { name: "02-lunch-menu.png", kind: "image" },
+  { name: "03-store-tour.mp4", kind: "video" },
+];
+---
+
+<section id="how-it-works" class="flex scroll-mt-8 flex-col gap-14 pt-30">
+  <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <h2 class="text-[32px] leading-10 font-semibold tracking-[-0.03em] sm:text-[40px] sm:leading-12">How it works</h2>
+    <span class="font-mono text-[13px] text-muted">3 steps · about five minutes</span>
+  </div>
+
+  <ol>
+    {
+      steps.map((step, i) => {
+        const last = i === steps.length - 1;
+        return (
+          <li class="flex gap-5 sm:gap-8">
+            <div class="flex w-8 shrink-0 flex-col items-center" aria-hidden="true">
+              <span
+                class:list={[
+                  "flex size-8 shrink-0 items-center justify-center rounded-full border-[1.5px] font-mono text-[13px]",
+                  last ? "border-live text-live" : "border-fg",
+                ]}
+              >
+                {i + 1}
+              </span>
+              {!last && <span class="w-[1.5px] flex-1 bg-edge" />}
+            </div>
+
+            <div class:list={["flex min-w-0 flex-1 flex-col gap-8 lg:flex-row lg:gap-8", !last && "pb-18"]}>
+              <div class="flex flex-col gap-2.5 pt-1 lg:w-[340px] lg:shrink-0">
+                <h3 class="text-[22px] leading-7 font-semibold tracking-[-0.015em]">{step.title}</h3>
+                <p class="text-[15px] leading-6 text-muted">{step.body}</p>
+              </div>
+
+              <div class="flex min-w-0 flex-1 lg:justify-end">
+                {i === 0 && (
+                  <svg viewBox="0 0 600 210" fill="none" class="h-auto w-full max-w-[600px]" aria-hidden="true">
+                    <rect x="0.75" y="57.75" width="168.5" height="102.5" rx="7" fill="#0d0d0d" stroke="#fff" stroke-width="1.5" />
+                    <g fill="#555">
+                      {Array.from({ length: 12 }, (_, d) => (
+                        <circle cx={20 + d * 8} cy="68" r="1.4" />
+                      ))}
+                    </g>
+                    <g stroke="#555" stroke-width="1.2">
+                      <rect x="46" y="90" width="34" height="34" rx="3" fill="#1a1a1a" />
+                      <rect x="88" y="95" width="18" height="24" rx="2" stroke="#333" />
+                      <rect x="140" y="70" width="29" height="22" rx="2" fill="#000" />
+                      <rect x="140" y="98" width="29" height="22" rx="2" fill="#000" />
+                      <rect x="140" y="126" width="29" height="22" rx="2" fill="#000" />
+                    </g>
+                    <circle cx="16" cy="146" r="2.5" fill="#3ddc84" />
+                    <path d="M60 160 V200 H0" stroke="#333" stroke-width="1.5" />
+                    <text x="4" y="194" font-family="JetBrains Mono Variable, monospace" font-size="11" fill="#666">
+                      power
+                    </text>
+                    <path d="M169 109 C240 109 250 105 330 105" stroke="#fff" stroke-width="1.5" />
+                    <text x="226" y="96" font-family="JetBrains Mono Variable, monospace" font-size="11" fill="#666">
+                      HDMI
+                    </text>
+                    <rect x="330.75" y="10.75" width="268.5" height="168.5" rx="6" fill="#0d0d0d" stroke="#555" stroke-width="1.5" />
+                    <path d="M435 196 H495" stroke="#555" stroke-width="1.5" stroke-linecap="round" />
+                    <text
+                      x="465"
+                      y="102"
+                      text-anchor="middle"
+                      font-family="Inter Variable, sans-serif"
+                      font-weight="600"
+                      font-size="22"
+                      fill="#fff"
+                    >
+                      Welcome
+                    </text>
+                    <circle cx="346" cy="164" r="3" fill="#3ddc84" />
+                  </svg>
+                )}
+
+                {i === 1 && (
+                  <div class="flex w-full max-w-[600px] min-w-0 flex-col gap-3.5 font-mono text-xs leading-5" aria-hidden="true">
+                    <div class="flex justify-between gap-4 border-b border-line pb-2.5 text-[13px] text-faint">
+                      <span>ssh pi@lobby.local</span>
+                      <span class="hidden sm:inline">copied from /install</span>
+                    </div>
+                    <div class="flex gap-2.5">
+                      <span class="text-faint">$</span>
+                      <span class="truncate">sudo ./pi-display setup eyJzb3VyY2UiOiJzbWI6Ly9uYXMubG9jYWwvc2NyZWVucyIs…</span>
+                    </div>
+                    <div class="flex gap-2.5">
+                      <span class="text-live">✓</span>
+                      <span class="text-muted">
+                        Done. The slideshow is starting now and on every boot. Logs: pi-display logs
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                      <span class="text-faint">$</span>
+                      <span class="h-4 w-2 bg-fg" />
+                    </div>
+                  </div>
+                )}
+
+                {i === 2 && (
+                  <div class="flex w-full flex-col gap-6 sm:flex-row sm:items-center sm:gap-0 lg:w-auto" aria-hidden="true">
+                    <div class="flex flex-col font-mono text-[13px] leading-5 sm:w-[300px] sm:shrink-0">
+                      <div class="flex justify-between border-b border-line pb-2.5 text-faint">
+                        <span>smb://nas.local/screens</span>
+                        <span>4 files</span>
+                      </div>
+                      {files.map((file) => (
+                        <div class="flex justify-between border-b border-line py-2.5">
+                          <span class="text-muted">{file.name}</span>
+                          <span class="text-faint">{file.kind}</span>
+                        </div>
+                      ))}
+                      <div class="flex justify-between border-b border-line py-2.5">
+                        <span>04-event-tonight.png</span>
+                        <span class="text-live">+ new</span>
+                      </div>
+                    </div>
+                    <svg width="80" height="24" viewBox="0 0 80 24" fill="none" class="hidden shrink-0 sm:block">
+                      <path d="M8 12 H64" stroke="#333" stroke-width="1.5" />
+                      <path d="M60 7 L66 12 L60 17" stroke="#555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                      <circle cx="36" cy="12" r="3" fill="#3ddc84" />
+                    </svg>
+                    <figure class="flex w-[220px] shrink-0 flex-col gap-2.5">
+                      <div class="flex h-[124px] items-center justify-center rounded border border-[#555] bg-screen">
+                        <span class="text-lg font-semibold tracking-[-0.01em]">Event tonight</span>
+                      </div>
+                      <figcaption class="flex items-center justify-between text-[13px]">
+                        <span>Lobby</span>
+                        <span class="flex items-center gap-1.5 text-muted">
+                          <span class="size-1.5 rounded-full bg-live" />
+                          Playing
+                        </span>
+                      </figcaption>
+                    </figure>
+                  </div>
+                )}
+              </div>
+            </div>
+          </li>
+        );
+      })
+    }
+  </ol>
+</section>
