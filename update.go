@@ -90,7 +90,11 @@ func update(ctx context.Context) error {
 	if err := replaceBinary(bin); err != nil {
 		return err
 	}
-	if _, err := os.Stat(unitPath); err == nil {
+	// Rewrite the service too, so changes to it reach Pis set up earlier.
+	if username, err := unitUser(); err == nil {
+		if err := writeUnit(username); err != nil {
+			return err
+		}
 		if err := runCmd("systemctl", "restart", "pi-display"); err != nil {
 			return err
 		}

@@ -1,10 +1,10 @@
 # Pi Display
 
-<a href="https://pi-display-five.vercel.app"><img src="marketing/public/og.gif" alt="SMB, Google Drive, and local folders feeding a Raspberry Pi that plays on three screens" width="600"></a>
+<a href="https://pi-display.maks112v.com"><img src="marketing/public/og.gif" alt="SMB, Google Drive, and local folders feeding a Raspberry Pi that plays on three screens" width="600"></a>
 
 Turns a Raspberry Pi into a full-screen slideshow of every image and video in a folder, played in filename order. The folder can be local, on an SMB share, or a public Google Drive folder. The Pi boots straight into the slideshow whenever it gets power.
 
-**Start at [pi-display-five.vercel.app](https://pi-display-five.vercel.app).** The [install page](https://pi-display-five.vercel.app/install) builds a one-line setup command for your folder, the [config generator](https://pi-display-five.vercel.app/config) builds a `display.toml`, and the [docs](https://pi-display-five.vercel.app/docs) cover everything below in more detail.
+**Start at [pi-display.maks112v.com](https://pi-display.maks112v.com).** The [install page](https://pi-display.maks112v.com/install) builds a one-line setup command for your folder, the [config generator](https://pi-display.maks112v.com/config) builds a `display.toml`, and the [docs](https://pi-display.maks112v.com/docs) cover everything below in more detail.
 
 ## Getting started
 

@@ -31,10 +31,13 @@ const (
 // render groups on Raspberry Pi OS) and is sandboxed to its state directory.
 // It starts after the boot splash quits, like getty does: mpv started while
 // Plymouth holds the screen loses it when the splash exits, leaving the
-// console showing.
+// console showing. It conflicts with the desktop for the same reason, so
+// starting either one stops the other, and the slideshow waits for the
+// desktop to let go of the screen before mpv starts.
 const unitTemplate = `[Unit]
 Description=Pi Display slideshow
-After=local-fs.target plymouth-quit-wait.service
+After=local-fs.target plymouth-quit-wait.service display-manager.service
+Conflicts=display-manager.service
 
 [Service]
 User=%s
@@ -115,13 +118,12 @@ func setup(ctx context.Context, code string) error {
 	if err := installBinary(); err != nil {
 		return err
 	}
-	if err := os.WriteFile(unitPath, fmt.Appendf(nil, unitTemplate, account.Username), 0o644); err != nil {
+	if err := writeUnit(account.Username); err != nil {
 		return err
 	}
 
 	// mpv draws straight to the display, which only works when no desktop
 	// session holds the screen.
-	stopDesktop := false
 	if target, _ := exec.Command("systemctl", "get-default").Output(); strings.TrimSpace(string(target)) == "graphical.target" {
 		ok := code != ""
 		if !ok {
@@ -134,31 +136,45 @@ func setup(ctx context.Context, code string) error {
 				return err
 			}
 			fmt.Println("Desktop disabled at boot. Undo with: sudo systemctl set-default graphical.target")
-			stopDesktop = exec.Command("systemctl", "is-active", "--quiet", "display-manager").Run() == nil
 		} else {
 			fmt.Println("Leaving the desktop on; the slideshow will fail until it is off.")
 		}
 	}
 
-	for _, args := range [][]string{{"daemon-reload"}, {"enable", "pi-display"}, {"restart", "pi-display"}} {
-		if err := runCmd("systemctl", args...); err != nil {
-			return err
-		}
+	if err := runCmd("systemctl", "enable", "pi-display"); err != nil {
+		return err
 	}
 	// The boot logo is cosmetic, so a failure here doesn't fail setup.
 	if err := installSplash(); err != nil {
 		fmt.Println("Skipped the boot logo:", err)
 	}
 	fmt.Println("Done. The slideshow is starting now and on every boot. Logs: pi-display logs")
+	// Last and without waiting: starting the slideshow stops a running
+	// desktop, which may be where setup is running.
+	return runCmd("systemctl", "--no-block", "restart", "pi-display")
+}
 
-	// The running desktop still holds the screen until it stops. Stop it last
-	// and without waiting, since setup may be running in one of its terminals.
-	// The service's Restart=always picks up the screen once it is free.
-	if stopDesktop {
-		fmt.Println("Stopping the desktop so the slideshow can take the screen.")
-		return runCmd("systemctl", "--no-block", "stop", "display-manager")
+// writeUnit installs the service, running as username, and reloads systemd
+// so the next start uses it.
+func writeUnit(username string) error {
+	if err := os.WriteFile(unitPath, fmt.Appendf(nil, unitTemplate, username), 0o644); err != nil {
+		return err
 	}
-	return nil
+	return runCmd("systemctl", "daemon-reload")
+}
+
+// unitUser returns the account an installed service runs as.
+func unitUser() (string, error) {
+	data, err := os.ReadFile(unitPath)
+	if err != nil {
+		return "", err
+	}
+	for line := range strings.Lines(string(data)) {
+		if name, ok := strings.CutPrefix(strings.TrimSpace(line), "User="); ok {
+			return name, nil
+		}
+	}
+	return "", fmt.Errorf("%s has no User= line", unitPath)
 }
 
 func serviceAccount() (*user.User, error) {
