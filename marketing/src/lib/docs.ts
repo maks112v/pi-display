@@ -6,7 +6,7 @@ export const nav = [
   { group: "Get started", slugs: ["index", "prepare-the-pi", "install", "run-setup"] },
   { group: "Media", slugs: ["smb", "google-drive", "local-folder", "supported-files"] },
   { group: "Configure", slugs: ["display-toml", "schedules", "stay-on"] },
-  { group: "Operate", slugs: ["commands", "updating", "logs", "files", "uninstall"] },
+  { group: "Operate", slugs: ["commands", "on-site", "updating", "logs", "files", "uninstall"] },
 ] as const;
 
 export type DocPage = CollectionEntry<"docs"> & { group: string; href: string };

@@ -59,6 +59,8 @@ sudo pi-display config <code> # apply slideshow settings from the config generat
 sudo pi-display uninstall    # remove Pi Display and everything setup added
 pi-display on 2h             # screen on for 2 hours, whatever the schedule says (see below)
 pi-display off 2h            # screen and TV off for 2 hours
+sudo pi-display start        # restart the slideshow, after the console or desktop
+sudo pi-display desktop      # stop the slideshow and start the desktop until reboot
 ```
 
 `update` downloads the build for your Pi, checks it against the release's `SHA256SUMS`, swaps it in, and restarts the slideshow.
@@ -135,6 +137,14 @@ pi-display on 0      # cancel either and go back to the schedule
 ```
 
 `on` also wakes a TV someone turned off with the remote, and `off` works with or without a schedule. A new command replaces the last one, takes effect at the next slide, and survives a reboot. Schedule changes and expired overrides take effect at the next slide. Set the Pi's timezone with `sudo raspi-config` so the schedule matches the wall clock.
+
+## Fixing a Pi on site
+
+If the Pi moves to a new building or the Wi-Fi changes, plug a keyboard into it and press **Ctrl+Alt+T**. The slideshow stops and the screen shows the console login. Log in with the Pi's account, then change Wi-Fi with `sudo raspi-config` (System Options, Wireless LAN). Ctrl+Alt+F1 through F12 work too.
+
+If the Pi has the desktop installed, `sudo pi-display desktop` starts it until the next reboot, for changing settings with a mouse.
+
+`sudo pi-display start` or a reboot brings the slideshow back. Media already on the Pi keeps working offline, so the slideshow plays the last synced copy until the network is back.
 
 ## Files on the Pi
 

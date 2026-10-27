@@ -8,6 +8,8 @@
 //	pi-display run                # what the service runs
 //	pi-display on [2h]            # screen on for a while, whatever the schedule says (0 cancels)
 //	pi-display off [2h]           # screen and TV off for a while (0 cancels)
+//	sudo pi-display start         # restart the slideshow, after the console or desktop
+//	sudo pi-display desktop       # stop the slideshow and start the desktop until reboot
 //	sudo pi-display update        # install the latest release and restart
 //	sudo pi-display uninstall     # remove the service, program, settings, and media
 //	pi-display status             # version, source, service health, and screen state
@@ -43,6 +45,10 @@ func main() {
 		err = applyConfig(argAt(2))
 	case "on", "off":
 		err = setOverride(overridePath, command == "on", argAt(2))
+	case "start":
+		err = startSlideshow()
+	case "desktop":
+		err = openDesktop()
 	case "update":
 		err = update(ctx)
 	case "uninstall":
@@ -54,7 +60,7 @@ func main() {
 	case "version":
 		fmt.Println(version)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: pi-display <setup [code]|config <code>|run|on|off [duration]|update|uninstall|status|logs|version>")
+		fmt.Fprintln(os.Stderr, "usage: pi-display <setup [code]|config <code>|run|on|off [duration]|start|desktop|update|uninstall|status|logs|version>")
 		os.Exit(2)
 	}
 	if err != nil && !errors.Is(err, context.Canceled) {
@@ -105,11 +111,33 @@ func run(ctx context.Context) error {
 		go syncLoop(ctx, device, dir, logs)
 	}
 
+	// Ctrl+Alt+T on a keyboard plugged into the Pi stops mpv, which hands the
+	// screen back to the console so someone on site can log in and fix things
+	// like Wi-Fi. Syncing keeps going. `sudo pi-display start` or a reboot
+	// brings the slideshow back.
+	slideshow, toConsole := context.WithCancel(ctx)
+	defer toConsole()
+	go watchKeys(toConsole)
+
+	err = playFolder(slideshow, dir, device.baseShow())
+	if ctx.Err() != nil || slideshow.Err() == nil {
+		return err
+	}
+	log.Print("keyboard asked for the console; slideshow stopped until `sudo pi-display start` or a reboot")
+	if err := setTVPower(ctx, true); err != nil {
+		log.Printf("couldn't wake the TV over HDMI-CEC: %v", err)
+	}
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+// playFolder runs mpv on dir until ctx is done or playback fails, and waits
+// for mpv to exit before returning so the screen is free.
+func playFolder(ctx context.Context, dir string, base Show) error {
 	player, err := startMPV(ctx, socketPath)
 	if err != nil {
 		return err
 	}
 	defer player.close()
-
-	return play(ctx, player, dir, device.baseShow())
+	return play(ctx, player, dir, base)
 }
