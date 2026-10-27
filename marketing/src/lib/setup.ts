@@ -5,12 +5,16 @@
 
 export type Fit = "contain" | "cover";
 
+// Where the media lives. Picked first in the generator; null until chosen.
+export type SourceKind = "smb" | "drive";
+
 export interface Override {
   name: string;
   seconds: number;
 }
 
 export interface Settings {
+  kind: SourceKind | null;
   source: string;
   username: string;
   password: string;
@@ -24,6 +28,7 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
+  kind: null,
   source: "",
   username: "",
   password: "",
@@ -40,13 +45,27 @@ export const maxSeconds = 24 * 60 * 60;
 
 export const isValidSeconds = (n: number) => Number.isInteger(n) && n >= 1 && n <= maxSeconds;
 
-// Only SMB shares take a login; Drive links and local paths ignore it.
-export const needsLogin = (source: string) => source.trim().toLowerCase().startsWith("smb://");
+// Same check as parseDriveFolder in drive.go.
+function isDriveFolder(source: string) {
+  if (!source.startsWith("https://drive.google.com/")) return false;
+  const id = new URL(source).pathname.split("/folders/")[1]?.split("/")[0] ?? "";
+  return /^[\w-]{10,}$/.test(id);
+}
+
+// The source as the Pi expects it, or null if it can't be used yet. SMB
+// addresses may skip the smb:// prefix or use Windows form (\\nas\screens).
+export function normalizeSource(kind: SourceKind | null, raw: string): string | null {
+  const source = raw.trim();
+  if (!kind || !source) return null;
+  if (kind === "drive") return isDriveFolder(source) ? source : null;
+  const path = source.replace(/^smb:\/\//i, "").replaceAll("\\", "/").replace(/^\/+/, "");
+  const [host, share] = path.split("/");
+  return host && share ? `smb://${path}` : null;
+}
 
 // Mirrors the JSON shape of Device and Show in config.go.
-function device(s: Settings) {
-  const source = s.source.trim();
-  const login = needsLogin(source)
+function device(s: Settings, source: string) {
+  const login = s.kind === "smb"
     ? { ...(s.username && { username: s.username }), ...(s.username && s.password && { password: s.password }) }
     : {};
 
@@ -70,8 +89,9 @@ function device(s: Settings) {
 }
 
 export function setupCommand(s: Settings): string | null {
-  if (!s.source.trim()) return null;
-  const bytes = new TextEncoder().encode(JSON.stringify(device(s)));
+  const source = normalizeSource(s.kind, s.source);
+  if (!source) return null;
+  const bytes = new TextEncoder().encode(JSON.stringify(device(s, source)));
   const code = btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(""));
   return `sudo ./pi-display setup ${code}`;
 }

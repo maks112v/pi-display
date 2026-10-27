@@ -9,6 +9,12 @@ const button = {
   secondary: "rounded-md border border-edge px-5 py-3 text-[15px] font-medium hover:border-muted",
 };
 
+// Mirrors imageExts and videoExts in media.go.
+const formats = [
+  ...["JPEG", "PNG", "GIF", "WebP", "BMP"].map((name) => ({ name, kind: "image" })),
+  ...["MP4", "MOV", "MKV", "WebM", "M4V", "AVI"].map((name) => ({ name, kind: "video" })),
+];
+
 const steps = [
   {
     title: "Connect a Pi to the TV",
@@ -52,6 +58,27 @@ const features = [
   </section>
 
   <HeroFlow />
+
+  <section
+    aria-label="Supported formats"
+    class="mt-24 overflow-hidden border-y border-line py-5 mask-x-from-90% mask-x-to-100% motion-reduce:mask-none"
+  >
+    <ul
+      class="flex w-max animate-marquee font-mono text-[13px] hover:[animation-play-state:paused] motion-reduce:w-auto motion-reduce:animate-none motion-reduce:flex-wrap motion-reduce:justify-center motion-reduce:gap-y-2"
+    >
+      {
+        [...formats, ...formats].map((format, i) => (
+          <li
+            class:list={["flex items-baseline gap-2 pr-12", i >= formats.length && "motion-reduce:hidden"]}
+            aria-hidden={i >= formats.length ? "true" : undefined}
+          >
+            <span>{format.name}</span>
+            <span class="text-faint">{format.kind}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
 
   <section id="how-it-works" class="flex scroll-mt-8 flex-col gap-10 pt-30">
     <h2 class="text-[28px] font-semibold tracking-[-0.02em]">How it works</h2>

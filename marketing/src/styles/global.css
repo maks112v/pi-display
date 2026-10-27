@@ -14,4 +14,12 @@
   --color-edge: #333;
   --color-screen: #0d0d0d;
   --color-live: #3ddc84;
+
+  /* Scrolls a list rendered twice by one copy's width, so it loops seamlessly. */
+  --animate-marquee: marquee 40s linear infinite;
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
 }
