@@ -91,9 +91,9 @@ func screenState(s *Schedule, override, now time.Time) string {
 	case s == nil:
 		return "on, no schedule"
 	case s.awake(now):
-		return fmt.Sprintf("on, schedule %s-%s", s.On, s.Off)
+		return "on, schedule " + s.String()
 	default:
-		return fmt.Sprintf("off, schedule %s-%s", s.On, s.Off)
+		return "off, schedule " + s.String()
 	}
 }
 

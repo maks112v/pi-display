@@ -10,6 +10,8 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -133,35 +135,157 @@ func (s Show) validate() error {
 	if s.Fit != "contain" && s.Fit != "cover" {
 		return fmt.Errorf(`fit must be "contain" or "cover", got %q`, s.Fit)
 	}
-	if s.Schedule != nil && s.Schedule.On == s.Schedule.Off {
-		return errors.New("schedule on and off must differ")
-	}
 	return nil
 }
 
-// Schedule is the daily window the screen is on, in the Pi's local time. An
-// off time earlier than the on time spans midnight.
-type Schedule struct {
-	On  clock `toml:"on" json:"on"`
-	Off clock `toml:"off" json:"off"`
+// Schedule is when the screen is on, in the Pi's local time: a list of
+// windows for each day, indexed by time.Weekday. A window whose off time is
+// earlier than its on time runs past midnight into the next day. It is
+// written either as one window for every day:
+//
+//	on = "07:00"
+//	off = "22:00"
+//
+// or per weekday, with days left out staying off:
+//
+//	sun = ["09:00-18:00"]
+//	fri = ["07:00-12:00", "17:00-22:00"]
+type Schedule [7][]window
+
+// window is one stretch of on time, written "HH:MM-HH:MM".
+type window struct{ On, Off clock }
+
+var dayKeys = [7]string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
+
+// UnmarshalTOML and UnmarshalJSON share parseSchedule, so display.toml and
+// setup codes accept exactly the same shapes.
+func (s *Schedule) UnmarshalTOML(data any) error {
+	m, ok := data.(map[string]any)
+	if !ok {
+		return errors.New("schedule must be a table")
+	}
+	v, err := parseSchedule(m)
+	*s = v
+	return err
 }
 
-// UnmarshalJSON requires both times, matching parseShow's check for TOML.
 func (s *Schedule) UnmarshalJSON(data []byte) error {
-	var v struct {
-		On  *clock `json:"on"`
-		Off *clock `json:"off"`
-	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&v); err != nil {
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
-	if v.On == nil || v.Off == nil {
-		return errors.New("schedule needs both on and off")
+	v, err := parseSchedule(m)
+	*s = v
+	return err
+}
+
+// MarshalJSON writes the per-day form, which round-trips through
+// UnmarshalJSON whichever form was read.
+func (s Schedule) MarshalJSON() ([]byte, error) {
+	m := map[string][]string{}
+	for day, windows := range s {
+		for _, w := range windows {
+			m[dayKeys[day]] = append(m[dayKeys[day]], w.String())
+		}
 	}
-	*s = Schedule{On: *v.On, Off: *v.Off}
-	return nil
+	return json.Marshal(m)
+}
+
+func parseSchedule(m map[string]any) (Schedule, error) {
+	var s Schedule
+	on, hasOn := m["on"]
+	off, hasOff := m["off"]
+	if hasOn || hasOff {
+		if !hasOn || !hasOff {
+			return s, errors.New("schedule needs both on and off")
+		}
+		if len(m) > 2 {
+			return s, errors.New("schedule takes on and off, or days, not both")
+		}
+		var w window
+		if err := w.On.parse(on); err != nil {
+			return s, err
+		}
+		if err := w.Off.parse(off); err != nil {
+			return s, err
+		}
+		if w.On == w.Off {
+			return s, errors.New("schedule on and off must differ")
+		}
+		for day := range s {
+			s[day] = []window{w}
+		}
+		return s, nil
+	}
+
+	for key, v := range m {
+		day := slices.Index(dayKeys[:], key)
+		if day < 0 {
+			return s, fmt.Errorf("unknown schedule key %q, want on, off, or %s", key, strings.Join(dayKeys[:], ", "))
+		}
+		list, ok := v.([]any)
+		if !ok {
+			return s, fmt.Errorf(`schedule.%s must be a list like ["09:00-17:00"]`, key)
+		}
+		for _, item := range list {
+			text, ok := item.(string)
+			if !ok {
+				return s, fmt.Errorf(`schedule.%s: %v is not a quoted window like "09:00-17:00"`, key, item)
+			}
+			w, err := parseWindow(text)
+			if err != nil {
+				return s, fmt.Errorf("schedule.%s: %w", key, err)
+			}
+			s[day] = append(s[day], w)
+		}
+	}
+	if !slices.ContainsFunc(s[:], func(ws []window) bool { return len(ws) > 0 }) {
+		return s, errors.New("schedule has no hours; leave it out to stay on all the time")
+	}
+	return s, nil
+}
+
+func parseWindow(text string) (window, error) {
+	var w window
+	on, off, ok := strings.Cut(text, "-")
+	if !ok {
+		return w, fmt.Errorf("%q is not a window like 09:00-17:00", text)
+	}
+	if err := w.On.UnmarshalText([]byte(on)); err != nil {
+		return w, err
+	}
+	if err := w.Off.UnmarshalText([]byte(off)); err != nil {
+		return w, err
+	}
+	if w.On == w.Off {
+		return w, fmt.Errorf("%q starts and ends at the same time", text)
+	}
+	return w, nil
+}
+
+func (w window) String() string { return w.On.String() + "-" + w.Off.String() }
+
+// String summarizes the schedule for `pi-display status`, like
+// "daily 07:00-22:00" or "Sun 09:00-18:00, Fri 17:00-22:00".
+func (s Schedule) String() string {
+	if !slices.ContainsFunc(s[1:], func(ws []window) bool { return !slices.Equal(ws, s[0]) }) {
+		return "daily " + joinWindows(s[0])
+	}
+	var days []string
+	for day, windows := range s {
+		if len(windows) > 0 {
+			days = append(days, time.Weekday(day).String()[:3]+" "+joinWindows(windows))
+		}
+	}
+	return strings.Join(days, ", ")
+}
+
+func joinWindows(ws []window) string {
+	parts := make([]string, len(ws))
+	for i, w := range ws {
+		parts[i] = w.String()
+	}
+	return strings.Join(parts, " ")
 }
 
 // clock is a time of day in minutes after midnight, written "HH:MM".
@@ -176,24 +300,38 @@ func (c *clock) UnmarshalText(text []byte) error {
 	return nil
 }
 
-func (c clock) MarshalText() ([]byte, error) {
-	return []byte(c.String()), nil
+// parse reads a clock from a decoded TOML or JSON value, which must be a string.
+func (c *clock) parse(v any) error {
+	text, ok := v.(string)
+	if !ok {
+		return fmt.Errorf(`%v is not a quoted time like "07:00"`, v)
+	}
+	return c.UnmarshalText([]byte(text))
 }
 
 func (c clock) String() string {
 	return fmt.Sprintf("%02d:%02d", c/60, c%60)
 }
 
-// awake reports whether the schedule has the screen on at t.
+// awake reports whether the schedule has the screen on at t: inside one of
+// today's windows, or the overnight tail of one of yesterday's.
 func (s *Schedule) awake(t time.Time) bool {
 	if s == nil {
 		return true
 	}
 	now := clock(t.Hour()*60 + t.Minute())
-	if s.On < s.Off {
-		return s.On <= now && now < s.Off
+	today := t.Weekday()
+	for _, w := range s[today] {
+		if w.On <= now && (now < w.Off || w.Off < w.On) {
+			return true
+		}
 	}
-	return now >= s.On || now < s.Off
+	for _, w := range s[(today+6)%7] {
+		if w.Off < w.On && now < w.Off {
+			return true
+		}
+	}
+	return false
 }
 
 var defaultShow = Show{ImageSeconds: 10, Mute: true, Fit: "contain"}
@@ -217,8 +355,6 @@ func parseShow(data []byte, base Show) (Show, error) {
 	}
 	if s.Schedule == nil {
 		s.Schedule = base.Schedule
-	} else if !md.IsDefined("schedule", "on") || !md.IsDefined("schedule", "off") {
-		return base, errors.New("schedule needs both on and off")
 	}
 	if err := s.validate(); err != nil {
 		return base, err

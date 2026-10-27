@@ -3,7 +3,9 @@ title: Schedules
 description: Turn the screen off outside set hours.
 ---
 
-Add a `[schedule]` to [display.toml](/docs/display-toml), or turn on **Schedule** in the [guided setup](/config):
+Add a `[schedule]` to [display.toml](/docs/display-toml), or pick hours in the **Schedule** step of the [guided setup](/config). Without a schedule, the screen is always on.
+
+## Same hours every day
 
 ```toml
 [schedule]
@@ -11,7 +13,19 @@ on = "07:00"
 off = "22:00"
 ```
 
-Times are 24-hour `HH:MM` in the Pi's local time. Without a schedule, the screen is always on.
+Times are 24-hour `HH:MM` in the Pi's local time.
+
+## By day of week
+
+List the hours for each day as `"HH:MM-HH:MM"` windows. Days you leave out stay off. A day can have more than one window:
+
+```toml
+[schedule]
+sun = ["09:00-18:00"]
+fri = ["07:00-12:00", "17:00-22:00"]
+```
+
+Days are `sun`, `mon`, `tue`, `wed`, `thu`, `fri`, and `sat`. A schedule uses either `on` and `off` or days, not both, and needs at least one window.
 
 ## Overnight hours
 
@@ -23,7 +37,7 @@ on = "18:00"
 off = "02:00"
 ```
 
-The on and off times must differ.
+In a day's list, the window runs into the next morning: `fri = ["20:00-01:00"]` is on until 1 AM Saturday. The on and off times must differ.
 
 ## Outside the schedule
 

@@ -104,6 +104,14 @@ on = "07:00"
 off = "22:00"
 ```
 
+Or set hours per weekday instead of `on`/`off`. Days left out stay off, and a day can have several windows:
+
+```toml
+[schedule]
+sun = ["09:00-18:00"]
+fri = ["07:00-12:00", "17:00-22:00"]
+```
+
 The file is parsed strictly. If it has an unknown key, a wrong type, or a value out of range, the whole file is ignored, the last good settings stay in effect, and the error is logged. Nothing in it is passed to mpv as raw options.
 
 If the Pi was set up with a setup code, its slideshow settings are the starting point and `display.toml` overrides only the keys it sets. `[durations]` entries are added to the ones from the code.

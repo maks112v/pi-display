@@ -22,6 +22,8 @@ Before writing the card, open the customisation settings and:
 
 ## Boot and connect
 
+> **Recommended:** use [Raspberry Pi Connect](https://www.raspberrypi.com/software/connect/). It gives you a shell on the Pi from your browser, so you can run the setup commands without finding its IP address or setting up SSH keys, and you can reach it remotely once it is mounted on the wall. Turn it on in Imager's customisation settings, or install it later with `sudo apt install rpi-connect-lite` and `rpi-connect signin`.
+
 Plug the Pi into the display and power it on. Once it has booted, SSH in as the user you created:
 
 ```sh

@@ -1,24 +1,30 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
+  dayNames,
+  days,
   defaultSettings,
   installCommand,
   isValidSeconds,
+  isValidWindow,
   maxSeconds,
   normalizeSource,
+  scheduleJSON,
   setupCommand,
-  type Fit,
+  type Day,
+  type Schedule,
   type Settings,
   type SourceKind,
+  type Window,
 } from "../lib/setup";
 
 const input =
   "h-11 w-full rounded-md border border-edge bg-transparent px-3.5 text-[15px] outline-none placeholder:text-faint focus:border-fg aria-invalid:border-red-500";
 
-const steps = ["Install", "Media source", "Playback", "Run setup"] as const;
+const steps = ["Install", "Media source", "Playback", "Schedule", "Run setup"] as const;
 
-// Guided setup: install the binary, pick a media source, tune playback, then
-// run the generated setup command. Nothing leaves the browser: the command is
-// computed from local state on render.
+// Guided setup: install the binary, pick a media source, tune playback, pick
+// the hours, then run the generated setup command. Nothing leaves the browser:
+// the command is computed from local state on render.
 export default function ConfigGenerator() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const update = (patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch }));
@@ -30,8 +36,11 @@ export default function ConfigGenerator() {
   const command = setupCommand(settings);
   // Only flag the address once something is typed, so an empty field isn't red.
   const sourceInvalid = settings.source.trim() !== "" && !source;
-  // Steps past the media source need a usable one.
-  const canLeave = step !== 1 || source !== null;
+  const schedule = scheduleJSON(settings.schedule);
+  // Steps past the media source need a usable one, and a timed schedule needs
+  // at least one window.
+  const canLeave =
+    (step !== 1 || source !== null) && (step !== 3 || settings.schedule.mode === "always" || schedule !== null);
 
   const heading = useRef<HTMLHeadingElement>(null);
   const mounted = useRef(false);
@@ -49,7 +58,15 @@ export default function ConfigGenerator() {
   const summaries: (string | null)[] = [
     null,
     settings.kind === "drive" ? "Google Drive folder" : source?.replace(/^smb:\/\//, "") ?? null,
-    `${isValidSeconds(settings.imageSeconds) ? settings.imageSeconds : defaultSettings.imageSeconds}s per image${settings.schedule ? ", timed" : ""}`,
+    `${isValidSeconds(settings.imageSeconds) ? settings.imageSeconds : defaultSettings.imageSeconds}s per image`,
+    !schedule
+      ? "Always on"
+      : settings.schedule.mode === "daily"
+        ? `${settings.schedule.daily.on}-${settings.schedule.daily.off} daily`
+        : days
+            .filter((day) => day in schedule)
+            .map((day) => dayNames[day].slice(0, 3))
+            .join(", "),
     null,
   ];
 
@@ -104,7 +121,7 @@ export default function ConfigGenerator() {
             Step {step + 1} of {steps.length}
           </span>
           <h2 ref={heading} tabIndex={-1} className="text-2xl font-semibold tracking-[-0.02em] outline-none">
-            {["Install pi-display", "Where is your media?", "How should it play?", "Run setup"][step]}
+            {["Install pi-display", "Where is your media?", "How should it play?", "When should it play?", "Run setup"][step]}
           </h2>
           <p className="text-[15px] leading-6 text-muted">
             {
@@ -112,6 +129,7 @@ export default function ConfigGenerator() {
                 "SSH into the Pi and run these two commands. New Pi? Flash Raspberry Pi OS Lite with SSH turned on first.",
                 "The Pi copies every image and video from this folder and keeps it in sync.",
                 "The defaults work for most screens. You can change any of this later.",
+                "Outside these hours the screen shows black. Times are the Pi's local time.",
                 "Run this in the same folder as before. It carries everything you picked, so there are no questions to answer.",
               ][step]
             }
@@ -233,7 +251,15 @@ export default function ConfigGenerator() {
                   <span id="fit-label" className="text-sm text-muted">
                     Fit
                   </span>
-                  <FitToggle labelledBy="fit-label" value={settings.fit} onChange={(fit) => update({ fit })} />
+                  <Segmented
+                    labelledBy="fit-label"
+                    options={[
+                      ["contain", "Contain"],
+                      ["cover", "Cover"],
+                    ]}
+                    value={settings.fit}
+                    onChange={(fit) => update({ fit })}
+                  />
                 </div>
               </div>
               <Switch label="Mute video audio" checked={settings.mute} onChange={(mute) => update({ mute })} />
@@ -263,16 +289,10 @@ export default function ConfigGenerator() {
                         <div className="w-24 shrink-0">
                           <SecondsInput label="Seconds" value={override.seconds} onChange={(seconds) => set({ seconds })} compact />
                         </div>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${override.name || "file"}`}
-                          className="flex size-8 shrink-0 items-center justify-center rounded text-faint hover:text-fg"
+                        <RemoveButton
+                          label={`Remove ${override.name || "file"}`}
                           onClick={() => update({ overrides: settings.overrides.filter((_, j) => j !== i) })}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-                            <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.5" />
-                          </svg>
-                        </button>
+                        />
                       </li>
                     );
                   })}
@@ -286,42 +306,14 @@ export default function ConfigGenerator() {
                 + Add file
               </button>
             </div>
-
-            <div className="flex flex-col gap-4 border-t border-line pt-8">
-              <Switch
-                label={
-                  <span className="flex flex-col gap-1">
-                    <span className="font-semibold">Schedule</span>
-                    <span className="text-sm text-muted">Turn the screen off outside these hours.</span>
-                  </span>
-                }
-                checked={settings.schedule !== null}
-                onChange={(on) => update({ schedule: on ? { on: "07:00", off: "22:00" } : null })}
-              />
-              {settings.schedule && (
-                <div className="flex gap-4">
-                  {(["on", "off"] as const).map((key) => (
-                    <Field key={key} label={key === "on" ? "Screen on" : "Screen off"}>
-                      {(id) => (
-                        <input
-                          id={id}
-                          type="time"
-                          className={`${input} [color-scheme:dark]`}
-                          value={settings.schedule?.[key] ?? ""}
-                          onChange={(e) =>
-                            settings.schedule && update({ schedule: { ...settings.schedule, [key]: e.target.value } })
-                          }
-                        />
-                      )}
-                    </Field>
-                  ))}
-                </div>
-              )}
-            </div>
           </>
         )}
 
-        {step === 3 && command && (
+        {step === 3 && (
+          <ScheduleEditor value={settings.schedule} onChange={(schedule) => update({ schedule })} />
+        )}
+
+        {step === 4 && command && (
           <>
             <div className="flex flex-col gap-3">
               <Output label="Terminal on the Pi" action={<CopyButton text={command} />}>
@@ -514,26 +506,168 @@ function SourcePicker({ value, onChange }: { value: SourceKind | null; onChange:
   );
 }
 
-function FitToggle({ labelledBy, value, onChange }: { labelledBy: string; value: Fit; onChange: (fit: Fit) => void }) {
-  const options: { fit: Fit; label: string }[] = [
-    { fit: "contain", label: "Contain" },
-    { fit: "cover", label: "Cover" },
-  ];
+// A row of mutually exclusive options, as [value, label] pairs.
+function Segmented<T extends string>({
+  labelledBy,
+  options,
+  value,
+  onChange,
+}: {
+  labelledBy: string;
+  options: [T, string][];
+  value: T;
+  onChange: (value: T) => void;
+}) {
   return (
     <div role="radiogroup" aria-labelledby={labelledBy} className="flex h-11 gap-1 rounded-md border border-edge p-1">
-      {options.map((option) => (
+      {options.map(([option, label]) => (
         <button
-          key={option.fit}
+          key={option}
           type="button"
           role="radio"
-          aria-checked={value === option.fit}
+          aria-checked={value === option}
           className="flex-1 rounded text-sm text-muted aria-checked:bg-line aria-checked:text-fg"
-          onClick={() => onChange(option.fit)}
+          onClick={() => onChange(option)}
         >
-          {option.label}
+          {label}
         </button>
       ))}
     </div>
+  );
+}
+
+// Picks always on, one window every day, or windows per weekday. Each weekday
+// takes any number of windows, so a day can have a morning and an evening.
+function ScheduleEditor({ value, onChange }: { value: Schedule; onChange: (schedule: Schedule) => void }) {
+  const setDay = (day: Day, windows: Window[]) => onChange({ ...value, weekly: { ...value.weekly, [day]: windows } });
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-2">
+        <span id="schedule-label" className="text-sm text-muted">
+          Plays
+        </span>
+        <Segmented
+          labelledBy="schedule-label"
+          options={[
+            ["always", "All the time"],
+            ["daily", "Same hours daily"],
+            ["weekly", "By day of week"],
+          ]}
+          value={value.mode}
+          onChange={(mode) => onChange({ ...value, mode })}
+        />
+      </div>
+
+      {value.mode === "daily" && (
+        <div className="flex gap-4">
+          {(["on", "off"] as const).map((key) => (
+            <Field key={key} label={key === "on" ? "Screen on" : "Screen off"}>
+              {(id) => (
+                <TimeInput
+                  id={id}
+                  value={value.daily[key]}
+                  onChange={(time) => onChange({ ...value, daily: { ...value.daily, [key]: time } })}
+                />
+              )}
+            </Field>
+          ))}
+        </div>
+      )}
+
+      {value.mode === "weekly" && (
+        <div className="flex flex-col gap-3">
+          <ul className="border-b border-line">
+            {days.map((day) => {
+              const name = dayNames[day];
+              const windows = value.weekly[day];
+              return (
+                <li key={day} className="flex items-start gap-4 border-t border-line py-2.5">
+                  <span className="w-24 shrink-0 text-[15px] leading-9">{name}</span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    {windows.length === 0 && <span className="text-sm leading-9 text-faint">Off</span>}
+                    {windows.map((w, j) => {
+                      const set = (patch: Partial<Window>) =>
+                        setDay(day, windows.map((o, k) => (k === j ? { ...o, ...patch } : o)));
+                      return (
+                        <div key={j} className="flex items-center gap-2">
+                          <TimeInput label={`${name} on`} value={w.on} invalid={!isValidWindow(w)} onChange={(on) => set({ on })} compact />
+                          <span className="text-sm text-faint">to</span>
+                          <TimeInput label={`${name} off`} value={w.off} invalid={!isValidWindow(w)} onChange={(off) => set({ off })} compact />
+                          <RemoveButton
+                            label={`Remove ${name} ${w.on}`}
+                            onClick={() => setDay(day, windows.filter((_, k) => k !== j))}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    className="h-9 shrink-0 text-sm font-medium hover:text-muted"
+                    onClick={() => setDay(day, [...windows, nextWindow(windows.at(-1))])}
+                  >
+                    + Hours
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-[13px] leading-5 text-faint">
+            An off time earlier than the on time runs past midnight into the next day.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A new window for a day: 09:00 to 18:00, or after the day's last window.
+function nextWindow(last: Window | undefined): Window {
+  if (!last) return { on: "09:00", off: "18:00" };
+  return { on: last.off, off: last.off < "22:00" ? "22:00" : "23:59" };
+}
+
+function TimeInput({
+  id,
+  label,
+  value,
+  invalid = false,
+  onChange,
+  compact = false,
+}: {
+  id?: string;
+  label?: string;
+  value: string;
+  invalid?: boolean;
+  onChange: (time: string) => void;
+  compact?: boolean;
+}) {
+  return (
+    <input
+      id={id}
+      aria-label={label}
+      type="time"
+      className={`${input} [color-scheme:dark] ${compact ? "h-9 w-auto min-w-0 flex-1" : ""}`}
+      value={value}
+      aria-invalid={invalid || value === ""}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="flex size-8 shrink-0 items-center justify-center rounded text-faint hover:text-fg"
+      onClick={onClick}
+    >
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+        <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    </button>
   );
 }
 

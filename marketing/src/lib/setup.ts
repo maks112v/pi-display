@@ -8,6 +8,34 @@ export type Fit = "contain" | "cover";
 // Where the media lives. Picked first in the generator; null until chosen.
 export type SourceKind = "smb" | "drive";
 
+// A stretch of on time as "HH:MM". Off earlier than on runs past midnight.
+export interface Window {
+  on: string;
+  off: string;
+}
+
+// Same keys and order as dayKeys in config.go.
+export const days = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+export type Day = (typeof days)[number];
+export const dayNames: Record<Day, string> = {
+  sun: "Sunday",
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+};
+
+// "always" plays nonstop, "daily" uses one window for every day, and "weekly"
+// uses a list of windows per day. Both are kept so switching modes doesn't
+// lose what was typed.
+export interface Schedule {
+  mode: "always" | "daily" | "weekly";
+  daily: Window;
+  weekly: Record<Day, Window[]>;
+}
+
 export interface Override {
   name: string;
   seconds: number;
@@ -23,8 +51,7 @@ export interface Settings {
   mute: boolean;
   shuffle: boolean;
   overrides: Override[];
-  // Daily on/off window as "HH:MM", or null for always on.
-  schedule: { on: string; off: string } | null;
+  schedule: Schedule;
 }
 
 export const defaultSettings: Settings = {
@@ -37,7 +64,7 @@ export const defaultSettings: Settings = {
   mute: true,
   shuffle: false,
   overrides: [],
-  schedule: null,
+  schedule: { mode: "always", daily: { on: "07:00", off: "22:00" }, weekly: { sun: [], mon: [], tue: [], wed: [], thu: [], fri: [], sat: [] } },
 };
 
 // Downloads the latest release for the Pi's architecture (arm64 or armhf)
@@ -51,6 +78,20 @@ export const installCommand = [
 export const maxSeconds = 24 * 60 * 60;
 
 export const isValidSeconds = (n: number) => Number.isInteger(n) && n >= 1 && n <= maxSeconds;
+
+export const isValidWindow = (w: Window) => w.on !== "" && w.off !== "" && w.on !== w.off;
+
+// The schedule as config.go's Schedule reads it, or null for always on (or a
+// weekly schedule with no usable hours yet, which the generator blocks).
+export function scheduleJSON(s: Schedule): Record<string, string | string[]> | null {
+  if (s.mode === "daily") return isValidWindow(s.daily) ? { ...s.daily } : null;
+  if (s.mode === "always") return null;
+  const entries = days.flatMap((day) => {
+    const windows = s.weekly[day].filter(isValidWindow).map((w) => `${w.on}-${w.off}`);
+    return windows.length > 0 ? [[day, windows] as const] : [];
+  });
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
 
 // Same check as parseDriveFolder in drive.go.
 function isDriveFolder(source: string) {
@@ -79,7 +120,7 @@ function device(s: Settings, source: string) {
   const durations = Object.fromEntries(
     s.overrides.filter((o) => o.name.trim() && isValidSeconds(o.seconds)).map((o) => [o.name.trim(), o.seconds]),
   );
-  const schedule = s.schedule && s.schedule.on && s.schedule.off && s.schedule.on !== s.schedule.off ? s.schedule : null;
+  const schedule = scheduleJSON(s.schedule);
 
   return {
     source,

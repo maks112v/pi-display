@@ -34,8 +34,8 @@ Every key is optional. Leave out anything you don't want to change.
   <dd>Plays every file once per loop in a new random order. The last file of one loop never plays first in the next.</dd>
   <dt><code>[durations]</code> <span>file name to seconds</span></dt>
   <dd>Gives specific images more or less time than <code>image_seconds</code>. Names must match the file exactly.</dd>
-  <dt><code>[schedule]</code> <span>on and off, "HH:MM"</span></dt>
-  <dd>The daily hours the screen is on. Both times are required. See <a href="/docs/schedules">Schedules</a>.</dd>
+  <dt><code>[schedule]</code> <span>on and off, or windows per day</span></dt>
+  <dd>The hours the screen is on: <code>on</code> and <code>off</code> for every day, or lists like <code>sun = ["09:00-18:00"]</code> per weekday. See <a href="/docs/schedules">Schedules</a>.</dd>
 </dl>
 
 ## If something is wrong
