@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -88,12 +89,21 @@ func setup(ctx context.Context, code string) error {
 		return err
 	}
 
-	if _, err := exec.LookPath("mpv"); err != nil {
-		fmt.Println("Installing mpv...")
+	// mpv plays the slideshow. cec-ctl (from v4l-utils) turns the TV off and
+	// on with the schedule.
+	var missing []string
+	for cmd, pkg := range map[string]string{"mpv": "mpv", "cec-ctl": "v4l-utils"} {
+		if _, err := exec.LookPath(cmd); err != nil {
+			missing = append(missing, pkg)
+		}
+	}
+	if len(missing) > 0 {
+		slices.Sort(missing)
+		fmt.Printf("Installing %s...\n", strings.Join(missing, " and "))
 		if err := runCmd("apt-get", "update"); err != nil {
 			return err
 		}
-		if err := runCmd("apt-get", "install", "-y", "mpv"); err != nil {
+		if err := runCmd("apt-get", append([]string{"install", "-y"}, missing...)...); err != nil {
 			return err
 		}
 	}

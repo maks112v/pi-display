@@ -56,6 +56,7 @@ export interface ShowSettings {
   fit: Fit;
   mute: boolean;
   shuffle: boolean;
+  tvPower: boolean;
   overrides: Override[];
   schedule: Schedule;
 }
@@ -67,6 +68,7 @@ export const defaultShow: ShowSettings = {
   fit: "contain",
   mute: true,
   shuffle: false,
+  tvPower: true,
   overrides: [],
   schedule: { mode: "always", daily: { on: "07:00", off: "22:00" }, weekly: { sun: [], mon: [], tue: [], wed: [], thu: [], fri: [], sat: [] } },
 };
@@ -129,6 +131,7 @@ function show(s: ShowSettings) {
     mute: s.mute,
     fit: s.fit,
     shuffle: s.shuffle,
+    tv_power: s.tvPower,
     ...(Object.keys(durations).length > 0 && { durations }),
     ...(schedule && { schedule }),
   };
@@ -160,6 +163,7 @@ export function displayToml(s: ShowSettings): string {
     `mute = ${v.mute}`,
     `fit = ${tomlString(v.fit)}`,
     `shuffle = ${v.shuffle}`,
+    `tv_power = ${v.tv_power}`,
   ];
   if (v.durations) {
     lines.push("", "[durations]", ...Object.entries(v.durations).map(([name, seconds]) => `${tomlString(name)} = ${seconds}`));

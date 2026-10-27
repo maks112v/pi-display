@@ -10,6 +10,7 @@ image_seconds = 10
 mute = true
 fit = "contain"
 shuffle = false
+tv_power = true
 
 [durations]
 "intro.jpg" = 30
@@ -32,6 +33,8 @@ Every key is optional. Leave out anything you don't want to change.
   <dd>Mutes video audio.</dd>
   <dt><code>shuffle</code> <span>boolean, default false</span></dt>
   <dd>Plays every file once per loop in a new random order. The last file of one loop never plays first in the next.</dd>
+  <dt><code>tv_power</code> <span>boolean, default true</span></dt>
+  <dd>Puts the TV in standby over HDMI-CEC when the schedule turns the screen off, and wakes it when the schedule turns it back on. See <a href="/docs/schedules">Schedules</a>.</dd>
   <dt><code>[durations]</code> <span>file name to seconds</span></dt>
   <dd>Gives specific images more or less time than <code>image_seconds</code>. Names must match the file exactly.</dd>
   <dt><code>[schedule]</code> <span>on and off, or windows per day</span></dt>

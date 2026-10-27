@@ -254,7 +254,9 @@ func play(ctx context.Context, m *mpv, dir string, base Show) error {
 		}
 
 		// Outside the schedule the screen goes black, unless `pi-display on`
-		// is holding it on. The change lands at the next file boundary.
+		// is holding it on. With tv_power the TV is also put in standby over
+		// HDMI-CEC, and woken when the schedule comes back. The change lands
+		// at the next file boundary.
 		now := time.Now()
 		if on := show.Schedule.awake(now) || now.Before(awakeUntil(wakePath)); on != screenOn {
 			screenOn = on
@@ -262,6 +264,11 @@ func play(ctx context.Context, m *mpv, dir string, base Show) error {
 				log.Print("screen on")
 			} else {
 				log.Print("screen off until the schedule turns it back on")
+			}
+			if show.TVPower {
+				if err := setTVPower(ctx, on); err != nil {
+					log.Printf("couldn't switch the TV over HDMI-CEC: %v", err)
+				}
 			}
 		}
 

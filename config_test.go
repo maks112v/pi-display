@@ -36,7 +36,7 @@ func TestParseShowDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.ImageSeconds != 10 || !s.Mute || s.Fit != "contain" {
+	if s.ImageSeconds != 10 || !s.Mute || s.Fit != "contain" || !s.TVPower {
 		t.Errorf("got %+v", s)
 	}
 }

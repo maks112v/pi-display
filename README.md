@@ -94,6 +94,7 @@ image_seconds = 10   # how long each image shows (default 10)
 mute = true          # mute video audio (default true)
 fit = "contain"      # "contain" letterboxes, "cover" fills and crops (default "contain")
 shuffle = false      # random order, reshuffled every time the folder loops (default false)
+tv_power = true      # turn the TV off and on with the schedule over HDMI-CEC (default true)
 
 # Per-image overrides, in seconds
 [durations]
@@ -120,7 +121,7 @@ If the Pi was set up with a setup code, its slideshow settings are the starting 
 
 ## Staying on for an event
 
-Outside the schedule the screen shows black. To keep the slideshow running anyway, SSH in and run:
+Outside the schedule the screen shows black, and with `tv_power` (on by default) the Pi puts the TV in standby over HDMI-CEC and wakes it when the schedule comes back. The TV needs CEC turned on in its settings, often under a brand name like Anynet+, Bravia Sync, or SimpLink. Set `tv_power = false` to leave the TV alone. To keep the slideshow running anyway, SSH in and run:
 
 ```sh
 pi-display on        # on for 1 hour

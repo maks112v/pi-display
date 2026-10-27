@@ -41,6 +41,8 @@ In a day's list, the window runs into the next morning: `fri = ["20:00-01:00"]` 
 
 ## Outside the schedule
 
-The screen shows black. Changes to the schedule take effect at the next slide. To keep the slideshow running for an evening event, see [Staying on for an event](/docs/stay-on).
+The screen shows black, and the Pi puts the TV in standby over HDMI-CEC. When the schedule comes back on, it wakes the TV and switches it to the Pi's input. Changes to the schedule take effect at the next slide.
+
+CEC has to be turned on in the TV's settings. Brands give it their own name: Anynet+ (Samsung), Bravia Sync (Sony), SimpLink (LG), or CEC. If the TV doesn't respond, the [logs](/docs/logs) say why. To leave the TV alone and only show black, set `tv_power = false` in [display.toml](/docs/display-toml). To keep the slideshow running for an evening event, see [Staying on for an event](/docs/stay-on).
 
 > Set the Pi's timezone with `sudo raspi-config` (under Localisation Options) so the schedule matches the wall clock.

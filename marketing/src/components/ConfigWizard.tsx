@@ -161,7 +161,18 @@ export default function ConfigWizard() {
         </>
       )}
 
-      {step === 1 && <ScheduleEditor value={settings.schedule} onChange={(schedule) => update({ schedule })} />}
+      {step === 1 && (
+        <div className="flex flex-col gap-8">
+          <ScheduleEditor value={settings.schedule} onChange={(schedule) => update({ schedule })} />
+          {settings.schedule.mode !== "always" && (
+            <Switch
+              label="Turn the TV off and on over HDMI-CEC"
+              checked={settings.tvPower}
+              onChange={(tvPower) => update({ tvPower })}
+            />
+          )}
+        </div>
+      )}
 
       {step === 2 && (
         <>

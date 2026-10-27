@@ -106,6 +106,7 @@ type Show struct {
 	Shuffle      bool           `toml:"shuffle" json:"shuffle"`
 	Durations    map[string]int `toml:"durations" json:"durations,omitempty"` // per-image seconds, keyed by filename
 	Schedule     *Schedule      `toml:"schedule" json:"schedule,omitempty"`   // nil means always on
+	TVPower      bool           `toml:"tv_power" json:"tv_power"`             // turn the TV off and on over HDMI-CEC with the schedule
 }
 
 // UnmarshalJSON starts from the defaults so a setup code only needs the
@@ -334,7 +335,7 @@ func (s *Schedule) awake(t time.Time) bool {
 	return false
 }
 
-var defaultShow = Show{ImageSeconds: 10, Mute: true, Fit: "contain"}
+var defaultShow = Show{ImageSeconds: 10, Mute: true, Fit: "contain", TVPower: true}
 
 const maxSeconds = 24 * 60 * 60
 
