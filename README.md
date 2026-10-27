@@ -39,13 +39,13 @@ Run it with `sudo` from your normal user, not as root. The slideshow runs as tha
 4. Installs itself to `/usr/local/bin/pi-display` and adds a service that starts the slideshow on every boot. You can delete the downloaded `./pi-display` afterwards.
 5. If the Pi boots to a desktop, offers to boot to console instead. Say yes: the slideshow needs the screen to itself.
 
-To skip the questions, fill in the config generator on the website and run the command it gives you: `sudo ./pi-display setup <code>`. The code carries the folder, login, and slideshow settings, and setup turns the desktop off at boot without asking. It includes the password encoded, not encrypted, so treat it like the password.
+To skip the questions, use the install page on the website and run the command it gives you: `sudo ./pi-display setup <code>`. The code carries the folder and login, and setup turns the desktop off at boot without asking. It includes the password encoded, not encrypted, so treat it like the password.
 
-The slideshow starts as soon as setup finishes, and again whenever the Pi gets power. Re-run `sudo pi-display setup` any time to point it at a different folder.
+The slideshow starts as soon as setup finishes, and again whenever the Pi gets power. Re-run `sudo pi-display setup` any time to point it at a different folder. Re-running keeps the slideshow settings already on the Pi.
 
 ### 4. Add media
 
-Put images and videos in the folder. New files show up within about 30 seconds. To change timing, add a [`display.toml`](#displaytoml) to the same folder.
+Put images and videos in the folder. New files show up within about 30 seconds. To change timing, add a [`display.toml`](#displaytoml) to the same folder. The config generator on the website builds one for you.
 
 ## Day to day
 
@@ -54,6 +54,8 @@ pi-display status            # version, source, service health, and whether the 
 pi-display logs              # watch the logs (journalctl -u pi-display -f)
 pi-display version           # show the installed release
 sudo pi-display update       # install the latest release, keeping your settings
+sudo pi-display config <code> # apply slideshow settings from the config generator to this Pi only
+sudo pi-display uninstall    # remove pi-display and everything setup added
 pi-display on 2h             # stay on outside the schedule (see below)
 ```
 

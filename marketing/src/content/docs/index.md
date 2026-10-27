@@ -13,7 +13,7 @@ pi-display plays every image and video in a folder, full screen, in filename ord
 
 ## Set up a screen
 
-The quickest way is the [guided setup](/config): it walks through installing, picking a folder, and playback, then gives you one command to run on the Pi.
+The quickest way is the [install page](/install): it walks through installing and picking a folder, then gives you one command to run on the Pi. The [config generator](/config) then sets timing and schedules.
 
 To do it by hand, follow these pages in order:
 

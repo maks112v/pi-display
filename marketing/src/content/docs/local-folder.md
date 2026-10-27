@@ -18,7 +18,7 @@ sudo ./pi-display setup
 Media folder (smb://host/share/path, a public Google Drive folder link, or /local/path): /home/pi/media
 ```
 
-Local folders aren't offered in the [guided setup](/config). Use the questions in `pi-display setup` instead.
+Local folders aren't offered on the [install page](/install). Use the questions in `pi-display setup` instead.
 
 ## Add files
 

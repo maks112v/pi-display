@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/term"
@@ -54,9 +56,10 @@ WantedBy=multi-user.target
 // setup gets the media source, checks it works, and installs a service that
 // starts the slideshow on every boot. Safe to re-run to change source.
 //
-// With a setup code from the web config generator it asks nothing: the code
-// carries the source, login, and slideshow settings, and the desktop is
-// turned off at boot if needed. Without one it prompts for the source.
+// With a setup code from the website's install page it asks nothing: the
+// code carries the source and login, and the desktop is turned off at boot if
+// needed. Without one it prompts for the source. Either way a Pi that was set
+// up before keeps its slideshow settings unless the code carries new ones.
 func setup(ctx context.Context, code string) error {
 	if os.Geteuid() != 0 {
 		return errors.New("run setup with sudo")
@@ -75,6 +78,11 @@ func setup(ctx context.Context, code string) error {
 	}
 	if err != nil {
 		return err
+	}
+	if device.Show == nil {
+		if current, err := loadDevice(devicePath); err == nil {
+			device.Show = current.Show
+		}
 	}
 	if err := checkSource(ctx, device); err != nil {
 		return err
@@ -107,7 +115,7 @@ func setup(ctx context.Context, code string) error {
 	if target, _ := exec.Command("systemctl", "get-default").Output(); strings.TrimSpace(string(target)) == "graphical.target" {
 		ok := code != ""
 		if !ok {
-			if ok, err = askYes(in, "The slideshow needs the screen, so the desktop must not start at boot. Boot to console instead? [Y/n] "); err != nil {
+			if ok, err = askYes(in, "The slideshow needs the screen, so the desktop must not start at boot. Boot to console instead? [Y/n] ", true); err != nil {
 				return err
 			}
 		}
@@ -147,8 +155,8 @@ func serviceAccount() (*user.User, error) {
 	return user.Lookup(name)
 }
 
-// decodeSetupCode reads the base64 code the web config generator produces:
-// a Device as JSON, including its slideshow settings.
+// decodeSetupCode reads the base64 code the website's install page produces:
+// a Device as JSON. Older codes also carry slideshow settings.
 func decodeSetupCode(code string) (Device, error) {
 	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(code))
 	if err != nil {
@@ -249,13 +257,19 @@ func ask(in *bufio.Reader, prompt string) (string, error) {
 	return strings.TrimSpace(line), nil
 }
 
-func askYes(in *bufio.Reader, prompt string) (bool, error) {
+// askYes asks a yes/no question; an empty answer means def.
+func askYes(in *bufio.Reader, prompt string, def bool) (bool, error) {
 	answer, err := ask(in, prompt)
 	if err != nil {
 		return false, err
 	}
-	answer = strings.ToLower(answer)
-	return answer == "" || answer == "y" || answer == "yes", nil
+	switch strings.ToLower(answer) {
+	case "":
+		return def, nil
+	case "y", "yes":
+		return true, nil
+	}
+	return false, nil
 }
 
 // installBinary copies this executable to binPath so the service doesn't
@@ -299,4 +313,60 @@ func runCmd(name string, args ...string) error {
 		return fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
 	}
 	return nil
+}
+
+// applyConfig saves slideshow settings from a code made by the website's
+// config generator ("Apply to this Pi only") and restarts the slideshow. The
+// source and login stay as they are, and display.toml still applies on top.
+func applyConfig(code string) error {
+	if os.Geteuid() != 0 {
+		return errors.New("run config with sudo")
+	}
+	if code == "" {
+		return errors.New("usage: sudo pi-display config <code>")
+	}
+	show, err := decodeConfigCode(code)
+	if err != nil {
+		return err
+	}
+	device, err := loadDevice(devicePath)
+	if err != nil {
+		return fmt.Errorf("load %s (run `sudo pi-display setup` first): %w", devicePath, err)
+	}
+	device.Show = &show
+
+	// Keep the file owned by the account the slideshow runs as.
+	info, err := os.Stat(devicePath)
+	if err != nil {
+		return err
+	}
+	owner, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return fmt.Errorf("can't read the owner of %s", devicePath)
+	}
+	if err := saveDevice(devicePath, device, int(owner.Uid), int(owner.Gid)); err != nil {
+		return err
+	}
+	if err := runCmd("systemctl", "restart", "pi-display"); err != nil {
+		return err
+	}
+	fmt.Println("Saved. The slideshow restarted with the new settings.")
+	return nil
+}
+
+// decodeConfigCode reads the base64 code the config generator produces: a
+// Show as JSON. Settings it leaves out keep their defaults.
+func decodeConfigCode(code string) (Show, error) {
+	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(code))
+	if err != nil {
+		return Show{}, fmt.Errorf("config code is not valid base64: %w", err)
+	}
+	var s Show
+	if err := json.Unmarshal(data, &s); err != nil {
+		return s, fmt.Errorf("config code: %w", err)
+	}
+	if err := s.validate(); err != nil {
+		return s, fmt.Errorf("config code: %w", err)
+	}
+	return s, nil
 }

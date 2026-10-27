@@ -3,7 +3,7 @@ title: display.toml
 description: Change timing, fit, and hours for every screen that plays from a folder, without touching the Pis.
 ---
 
-Drop a file named `display.toml` into the media folder. Each Pi re-reads it before every slide, so changes show up within one slide, plus up to 30 seconds of sync for SMB and Drive.
+The [config generator](/config) builds this file for you. Drop it into the media folder as `display.toml`. Each Pi re-reads it before every slide, so changes show up within one slide, plus up to 30 seconds of sync for SMB and Drive.
 
 ```toml
 image_seconds = 10
@@ -42,4 +42,12 @@ Every key is optional. Leave out anything you don't want to change.
 
 The file is read strictly. An unknown key, a wrong type, or an out-of-range value means the whole file is ignored, the last good settings stay in effect, and the error is [logged](/docs/logs). Nothing in it is passed to mpv as raw options.
 
-> Screens set up with a setup code start from the code's settings. `display.toml` only overrides the keys it sets, and its `[durations]` are added to the code's.
+## One Pi only
+
+To give a single screen its own settings, choose **Apply to this Pi only** in the config generator and run the command it shows:
+
+```sh
+sudo pi-display config <code>
+```
+
+It saves the settings on that Pi and restarts the slideshow. The folder and login stay as they are. A `display.toml` in the folder is still applied on top: it only overrides the keys it sets, and its `[durations]` are added to the Pi's.

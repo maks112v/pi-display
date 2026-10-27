@@ -1,17 +1,15 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import ConfigGenerator from "../components/ConfigGenerator";
+import ConfigWizard from "../components/ConfigWizard";
 ---
 
 <Layout
-  title="Set up a screen · pi-display"
-  description="Install pi-display on a Raspberry Pi, point it at an SMB share or Google Drive folder, and get a one-line setup command."
+  title="Config generator · pi-display"
+  description="Set slideshow timing, fit, and schedules, then download a display.toml for your media folder or apply it to one Pi."
 >
   <header class="flex flex-col gap-3 pt-20 pb-14">
-    <h1 class="text-[40px] leading-12 font-semibold tracking-[-0.03em]">Set up a screen</h1>
-    <p class="text-base text-muted">
-      Five steps from a fresh Pi to a running slideshow. Everything here stays in your browser.
-    </p>
+    <h1 class="text-[40px] leading-12 font-semibold tracking-[-0.03em]">Config generator</h1>
+    <p class="text-base text-muted">Set how your screens play. Save it as a file for the media folder, or apply it to one Pi.</p>
   </header>
-  <ConfigGenerator client:load />
+  <ConfigWizard client:load />
 </Layout>

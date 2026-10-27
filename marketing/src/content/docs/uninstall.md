@@ -3,7 +3,19 @@ title: Uninstall
 description: Remove pi-display and everything it added to the Pi.
 ---
 
-Over SSH on the Pi, stop the slideshow and remove the service:
+Over SSH on the Pi, run:
+
+```sh
+sudo pi-display uninstall
+```
+
+This stops the slideshow and removes the service, the program, its settings, and the mirrored media. If the Pi has a desktop that is switched off, it asks whether to turn it back on. If mpv is installed, it asks whether to remove it too.
+
+> The `uninstall` command arrived in v0.0.5. On an older release, run `sudo pi-display update` first, or use the manual steps below.
+
+## Manual steps
+
+To do the same by hand, stop the slideshow and remove the service:
 
 ```sh
 sudo systemctl disable --now pi-display
@@ -20,7 +32,7 @@ sudo rm -rf /etc/pi-display /var/lib/pi-display
 
 > `/etc/pi-display` holds the SMB password. Removing it is the step that takes the login off the Pi.
 
-## Optional cleanup
+### Optional cleanup
 
 If setup switched the Pi from a desktop to the console, switch it back:
 

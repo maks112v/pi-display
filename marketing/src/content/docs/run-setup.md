@@ -23,13 +23,13 @@ The slideshow starts as soon as setup finishes.
 
 ## Skip the questions
 
-The [guided setup](/config) builds a setup code from your folder, login, and playback settings. Run the command it gives you instead:
+The [install page](/install) builds a setup code from your folder and login. Run the command it gives you instead:
 
 ```sh
 sudo ./pi-display setup <code>
 ```
 
-With a code, setup turns the desktop off at boot without asking.
+With a code, setup turns the desktop off at boot without asking. Running it again on a Pi keeps that Pi's playback settings; set those in the [config generator](/config).
 
 > The code includes the password, encoded but not encrypted. Treat it like the password.
 

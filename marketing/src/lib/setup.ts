@@ -1,7 +1,8 @@
-// Builds the one-line setup command the config generator hands to the user.
-// The code is a Device (config.go) as JSON, base64-encoded, carrying the
-// source, login, and slideshow settings. The Pi rejects the whole code on any
-// unknown key or out-of-range value, so this only emits values that pass.
+// Builds what the install and config pages hand to the user: the setup
+// command (a Device from config.go as base64 JSON, carrying the source and
+// login), the display.toml for the media folder, and the config command that
+// applies the same settings to one Pi. The Pi rejects a whole file or code on
+// any unknown key or out-of-range value, so this only emits values that pass.
 
 export type Fit = "contain" | "cover";
 
@@ -41,11 +42,16 @@ export interface Override {
   seconds: number;
 }
 
-export interface Settings {
+// What the install page collects: where the media lives and how to log in.
+export interface SourceSettings {
   kind: SourceKind | null;
   source: string;
   username: string;
   password: string;
+}
+
+// What the config page collects: how the slideshow plays.
+export interface ShowSettings {
   imageSeconds: number;
   fit: Fit;
   mute: boolean;
@@ -54,11 +60,9 @@ export interface Settings {
   schedule: Schedule;
 }
 
-export const defaultSettings: Settings = {
-  kind: null,
-  source: "",
-  username: "",
-  password: "",
+export const defaultSource: SourceSettings = { kind: null, source: "", username: "", password: "" };
+
+export const defaultShow: ShowSettings = {
   imageSeconds: 10,
   fit: "contain",
   mute: true,
@@ -111,35 +115,63 @@ export function normalizeSource(kind: SourceKind | null, raw: string): string | 
   return host && share ? `smb://${path}` : null;
 }
 
-// Mirrors the JSON shape of Device and Show in config.go.
-function device(s: Settings, source: string) {
-  const login = s.kind === "smb"
-    ? { ...(s.username && { username: s.username }), ...(s.username && s.password && { password: s.password }) }
-    : {};
+const base64 = (text: string) =>
+  btoa(Array.from(new TextEncoder().encode(text), (b) => String.fromCharCode(b)).join(""));
 
+// Mirrors the JSON shape of Show in config.go.
+function show(s: ShowSettings) {
   const durations = Object.fromEntries(
     s.overrides.filter((o) => o.name.trim() && isValidSeconds(o.seconds)).map((o) => [o.name.trim(), o.seconds]),
   );
   const schedule = scheduleJSON(s.schedule);
-
   return {
-    source,
-    ...login,
-    show: {
-      image_seconds: isValidSeconds(s.imageSeconds) ? s.imageSeconds : defaultSettings.imageSeconds,
-      mute: s.mute,
-      fit: s.fit,
-      shuffle: s.shuffle,
-      ...(Object.keys(durations).length > 0 && { durations }),
-      ...(schedule && { schedule }),
-    },
+    image_seconds: isValidSeconds(s.imageSeconds) ? s.imageSeconds : defaultShow.imageSeconds,
+    mute: s.mute,
+    fit: s.fit,
+    shuffle: s.shuffle,
+    ...(Object.keys(durations).length > 0 && { durations }),
+    ...(schedule && { schedule }),
   };
 }
 
-export function setupCommand(s: Settings): string | null {
+// The setup command for the install page. The code carries only the source
+// and login, so re-running setup on a Pi keeps its playback settings.
+export function setupCommand(s: SourceSettings): string | null {
   const source = normalizeSource(s.kind, s.source);
   if (!source) return null;
-  const bytes = new TextEncoder().encode(JSON.stringify(device(s, source)));
-  const code = btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(""));
-  return `sudo ./pi-display setup ${code}`;
+  const login =
+    s.kind === "smb"
+      ? { ...(s.username && { username: s.username }), ...(s.username && s.password && { password: s.password }) }
+      : {};
+  return `sudo ./pi-display setup ${base64(JSON.stringify({ source, ...login }))}`;
+}
+
+// Applies playback settings to one Pi without touching its folder or login.
+export const configCommand = (s: ShowSettings) => `sudo pi-display config ${base64(JSON.stringify(show(s)))}`;
+
+// TOML strings are JSON strings for everything a file name or time holds.
+const tomlString = (text: string) => JSON.stringify(text);
+
+// The display.toml for the media folder, in the format README.md documents.
+export function displayToml(s: ShowSettings): string {
+  const v = show(s);
+  const lines = [
+    `image_seconds = ${v.image_seconds}`,
+    `mute = ${v.mute}`,
+    `fit = ${tomlString(v.fit)}`,
+    `shuffle = ${v.shuffle}`,
+  ];
+  if (v.durations) {
+    lines.push("", "[durations]", ...Object.entries(v.durations).map(([name, seconds]) => `${tomlString(name)} = ${seconds}`));
+  }
+  if (v.schedule) {
+    lines.push(
+      "",
+      "[schedule]",
+      ...Object.entries(v.schedule).map(([key, value]) =>
+        Array.isArray(value) ? `${key} = [${value.map(tomlString).join(", ")}]` : `${key} = ${tomlString(value)}`,
+      ),
+    );
+  }
+  return lines.join("\n") + "\n";
 }

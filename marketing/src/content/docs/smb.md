@@ -17,7 +17,7 @@ smb://192.168.1.20/media
 
 The first part after the host is the share name. Anything after it is a folder inside the share. Add a port if the server doesn't use the standard one: `smb://nas.local:4450/screens`.
 
-The [guided setup](/config) also accepts Windows-style paths like `\\nas\screens` and adds the `smb://` for you.
+The [install page](/install) also accepts Windows-style paths like `\\nas\screens` and adds the `smb://` for you.
 
 ## Login
 

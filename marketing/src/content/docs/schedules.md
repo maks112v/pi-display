@@ -3,7 +3,7 @@ title: Schedules
 description: Turn the screen off outside set hours.
 ---
 
-Add a `[schedule]` to [display.toml](/docs/display-toml), or pick hours in the **Schedule** step of the [guided setup](/config). Without a schedule, the screen is always on.
+Add a `[schedule]` to [display.toml](/docs/display-toml), or pick hours in the **Schedule** step of the [config generator](/config). Without a schedule, the screen is always on.
 
 ## Same hours every day
 

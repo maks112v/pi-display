@@ -207,3 +207,30 @@ func daily(on, off clock) *Schedule {
 	}
 	return &s
 }
+
+func TestDecodeConfigCode(t *testing.T) {
+	encode := func(json string) string { return base64.StdEncoding.EncodeToString([]byte(json)) }
+
+	s, err := decodeConfigCode(encode(`{"image_seconds":5,"fit":"cover","schedule":{"sun":["09:00-18:00"]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Settings the code leaves out keep their defaults.
+	if s.ImageSeconds != 5 || s.Fit != "cover" || !s.Mute {
+		t.Errorf("got %+v", s)
+	}
+	if got := s.Schedule.String(); got != "Sun 09:00-18:00" {
+		t.Errorf("schedule = %s", got)
+	}
+
+	for name, input := range map[string]string{
+		"not base64":  "!!!",
+		"unknown key": encode(`{"script":"evil.lua"}`),
+		"bad fit":     encode(`{"fit":"stretch"}`),
+		"a device":    encode(`{"source":"smb://nas/screens"}`),
+	} {
+		if _, err := decodeConfigCode(input); err == nil {
+			t.Errorf("%s: expected error", name)
+		}
+	}
+}
