@@ -22,7 +22,15 @@ type mpv struct {
 	cmd    *exec.Cmd
 	conn   net.Conn
 	events chan mpvEvent
+	vf     string // the video filter set for the current file
 }
+
+// imageVF shrinks images so neither side is over 2048px, the largest texture
+// a Pi 3 or Zero 2 GPU can draw. Bigger photos (straight off a camera or from
+// a stock site) otherwise decode fine and then show as a black screen, even
+// on a Pi 5. Smaller images pass through untouched, and videos get no filter
+// so they keep hardware decoding.
+const imageVF = "lavfi=[scale=w='min(iw,2048)':h='min(ih,2048)':force_original_aspect_ratio=decrease]"
 
 type mpvEvent struct {
 	Event  string          `json:"event"`
@@ -86,6 +94,9 @@ func startMPV(ctx context.Context, socket string) (*mpv, error) {
 		"--no-input-default-bindings",
 		"--input-vo-keyboard=no",
 		"--hwdec=auto-safe",
+		// mpv's default high-quality scaling drops most frames of a 1080p
+		// video on a Pi 5's GPU. Bilinear scaling plays smoothly.
+		"--profile=fast",
 		"--keep-open=yes", // hold a video's last frame until the next file replaces it
 		"--image-display-duration=inf",
 		"--input-ipc-server=" + socket,
@@ -163,6 +174,16 @@ func (m *mpv) show(ctx context.Context, path string, image bool, duration time.D
 	}
 	if err := m.command("set_property", "loop-file", loop); err != nil {
 		return err
+	}
+	vf := ""
+	if image {
+		vf = imageVF
+	}
+	if vf != m.vf {
+		if err := m.command("set_property", "vf", vf); err != nil {
+			return err
+		}
+		m.vf = vf
 	}
 	// Absolute paths keep mpv from treating a filename as a URL or protocol.
 	if err := m.command("loadfile", path, "replace"); err != nil {
