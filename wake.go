@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -32,7 +33,9 @@ func (o override) screenOn(s *Schedule, now time.Time) bool {
 // cancels either.
 func setOverride(path string, on bool, arg string) error {
 	d := time.Hour
-	if arg != "" {
+	if arg == "" {
+		arg = "1h"
+	} else {
 		var err error
 		if d, err = time.ParseDuration(arg); err != nil || d < 0 {
 			return fmt.Errorf("%q is not a duration like 90m or 2h", arg)
@@ -58,8 +61,33 @@ func setOverride(path string, on bool, arg string) error {
 	if err := os.Rename(tmp, path); err != nil {
 		return err
 	}
-	fmt.Printf("Screen %s until %s, then back on schedule.\n", state, until.Format("Mon 15:04"))
+	fmt.Printf("Screen %s for %s, until %s, then back on schedule.\n", state, arg, until.Format("Mon 15:04"))
 	return nil
+}
+
+// watchOverride signals on the returned channel when a `pi-display on|off`
+// changes the override at path. It checks every second, so the slideshow can
+// act on the command right away instead of after the current file.
+func watchOverride(ctx context.Context, path string) <-chan struct{} {
+	changed := make(chan struct{}, 1)
+	go func() {
+		last := readOverride(path)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+			}
+			if o := readOverride(path); o != last {
+				last = o
+				select {
+				case changed <- struct{}{}:
+				default: // a signal is already waiting
+				}
+			}
+		}
+	}()
+	return changed
 }
 
 // readOverride returns the override saved at path, or the zero override

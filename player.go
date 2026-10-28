@@ -164,8 +164,9 @@ func (m *mpv) close() {
 var errMPVExited = errors.New("mpv exited")
 
 // show displays one file and returns once it is done: after the image
-// duration, at the end of a video, or immediately if mpv can't load it.
-func (m *mpv) show(ctx context.Context, path string, image bool, duration time.Duration) error {
+// duration, at the end of a video, immediately if mpv can't load it, or as
+// soon as interrupt fires.
+func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, path string, image bool, duration time.Duration) error {
 	m.drain()
 	// Loop images so animated GIFs keep moving for their full duration.
 	loop := "no"
@@ -203,6 +204,8 @@ func (m *mpv) show(ctx context.Context, path string, image bool, duration time.D
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-interrupt:
+			return nil
 		case <-loadTimeout:
 			log.Printf("timed out loading %s", filepath.Base(path))
 			return nil
@@ -250,7 +253,8 @@ func (m *mpv) drain() {
 // layered over. While the folder has nothing to play, the image at empty is
 // shown instead. The folder, display.toml, and any `pi-display on|off`
 // override are re-read before every file, so changes show up without
-// restarting anything.
+// restarting anything. A new `pi-display on|off` also cuts the current file
+// short so it takes effect right away.
 // booted means the Pi just powered on, so the TV gets one wake over HDMI-CEC
 // if the screen should be on, even without tv_power, in case it came back up
 // in standby.
@@ -262,6 +266,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 	screenOn := true
 	bootWake := booted
 	var seen override // the last override read, to spot a new on or off command
+	interrupt := watchOverride(ctx, overridePath)
 	var lastProblem, lastSkip string
 	report := func(problem string) {
 		if problem != "" && problem != lastProblem {
@@ -293,7 +298,8 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 		// in standby over HDMI-CEC, and woken when the screen comes back on.
 		// A new on or off command switches the TV even if the screen was
 		// already in that state, so `on` wakes a TV someone turned off with
-		// the remote. The change lands at the next file boundary.
+		// the remote. Schedule changes and expired overrides land at the next
+		// file boundary.
 		now := time.Now()
 		o := readOverride(overridePath)
 		fresh := o != seen && o.active(now)
@@ -359,6 +365,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
+			case <-interrupt:
 			case <-time.After(5 * time.Second):
 			}
 			continue
@@ -372,12 +379,13 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
+			case <-interrupt:
 			case <-time.After(show.imageDuration(next)):
 			}
 			continue
 		}
 		current, showingEmpty = next, false
-		if err := m.show(ctx, filepath.Join(dir, next), image, show.imageDuration(next)); err != nil {
+		if err := m.show(ctx, interrupt, filepath.Join(dir, next), image, show.imageDuration(next)); err != nil {
 			return err
 		}
 	}

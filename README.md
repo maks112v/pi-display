@@ -141,7 +141,7 @@ pi-display off 2h    # off for any duration, TV in standby
 pi-display on 0      # cancel either and go back to the schedule
 ```
 
-`on` also wakes a TV someone turned off with the remote, and `off` works with or without a schedule. A new command replaces the last one, takes effect at the next slide, and survives a reboot. Schedule changes and expired overrides take effect at the next slide. Set the Pi's timezone with `sudo raspi-config` so the schedule matches the wall clock.
+`on` also wakes a TV someone turned off with the remote, and `off` works with or without a schedule. A new command replaces the last one, takes effect within a second, and survives a reboot. Schedule changes and expired overrides take effect at the next slide. Set the Pi's timezone with `sudo raspi-config` so the schedule matches the wall clock.
 
 ## Fixing a Pi on site
 

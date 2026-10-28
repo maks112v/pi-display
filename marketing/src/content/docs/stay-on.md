@@ -16,4 +16,4 @@ Durations use Go's format: `90m`, `2h`, `1h30m`.
 
 `off` shows black and puts the TV in standby over HDMI-CEC. It works with or without a schedule. `on` wakes the TV and switches it to the Pi's input, even if someone turned it off with the remote. The TV part needs `tv_power`, which is on by default. See [Schedules](/docs/schedules#outside-the-schedule).
 
-A new command replaces the last one, takes effect at the next slide, and survives a reboot. When it runs out, the screen goes back to its schedule.
+A new command replaces the last one, takes effect within a second, and survives a reboot. When it runs out, the screen goes back to its schedule.
