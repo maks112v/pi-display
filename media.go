@@ -2,7 +2,9 @@ package main
 
 import (
 	"cmp"
+	"fmt"
 	"hash/maphash"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -22,21 +24,53 @@ func isMedia(name string) bool {
 	return isImage(name) || slices.Contains(videoExts, strings.ToLower(filepath.Ext(name)))
 }
 
-// listMedia returns the playable files directly inside dir, in natural order.
-// Hidden files are skipped, which also hides in-progress sync downloads.
-func listMedia(dir string) ([]string, error) {
+// listMedia returns the playable files directly inside dir, in natural order,
+// and the media files it skipped because mpv can't play them. Hidden files
+// are skipped too, which also hides in-progress sync downloads.
+func listMedia(dir string) (names, unplayable []string, err error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var names []string
 	for _, e := range entries {
-		if e.Type().IsRegular() && !strings.HasPrefix(e.Name(), ".") && isMedia(e.Name()) {
-			names = append(names, e.Name())
+		if !e.Type().IsRegular() || strings.HasPrefix(e.Name(), ".") || !isMedia(e.Name()) {
+			continue
 		}
+		if isAnimatedWebP(filepath.Join(dir, e.Name())) {
+			unplayable = append(unplayable, e.Name())
+			continue
+		}
+		names = append(names, e.Name())
 	}
 	slices.SortFunc(names, naturalCompare)
-	return names, nil
+	slices.SortFunc(unplayable, naturalCompare)
+	return names, unplayable, nil
+}
+
+// isAnimatedWebP reports whether path is an animated WebP, like the .webp
+// files GIPHY serves. The FFmpeg in Raspberry Pi OS (7.1) only decodes still
+// WebP, so mpv shows nothing for these. An animated WebP starts with a VP8X
+// chunk whose flags byte has the animation bit (0x02) set.
+func isAnimatedWebP(path string) bool {
+	if strings.ToLower(filepath.Ext(path)) != ".webp" {
+		return false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	var header [21]byte
+	if _, err := io.ReadFull(f, header[:]); err != nil {
+		return false
+	}
+	return string(header[0:4]) == "RIFF" && string(header[8:16]) == "WEBPVP8X" && header[20]&0x02 != 0
+}
+
+// unplayableNote explains why the files in unplayable don't play.
+func unplayableNote(unplayable []string) string {
+	return fmt.Sprintf("skipping %s: animated WebP doesn't play on the Pi, convert to MP4 or GIF",
+		strings.Join(unplayable, ", "))
 }
 
 // playOrder decides what plays after current. Position is always derived

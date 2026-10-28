@@ -262,7 +262,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 	screenOn := true
 	bootWake := booted
 	var seen override // the last override read, to spot a new on or off command
-	var lastProblem string
+	var lastProblem, lastSkip string
 	report := func(problem string) {
 		if problem != "" && problem != lastProblem {
 			log.Print(problem)
@@ -321,13 +321,22 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 
 		var names []string
 		if screenOn {
+			var unplayable []string
 			var err error
-			names, err = listMedia(dir)
+			names, unplayable, err = listMedia(dir)
 			if err != nil {
 				problem = fmt.Sprintf("read %s: %v", dir, err)
 			} else if len(names) == 0 {
 				problem = fmt.Sprintf("no images or videos in %s yet", dir)
 			}
+			skip := ""
+			if len(unplayable) > 0 {
+				skip = unplayableNote(unplayable)
+			}
+			if skip != "" && skip != lastSkip {
+				log.Print(skip)
+			}
+			lastSkip = skip
 		}
 		report(problem)
 

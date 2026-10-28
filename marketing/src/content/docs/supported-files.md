@@ -10,6 +10,8 @@ description: Which files play, and in what order.
 
 Extensions are matched case-insensitively. Anything else in the folder, including `display.toml` and `.log` files, is ignored.
 
+Animated WebP files, like the ones GIPHY serves, don't play: the video decoder on Raspberry Pi OS only reads still WebP. Pi Display skips them and says so in the [logs](/docs/logs) and `pi-display status`. Save the animation as MP4 or GIF instead.
+
 ## Order
 
 Files play in natural filename order, so `2.jpg` plays before `10.jpg`. Number your files to control the order:

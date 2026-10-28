@@ -70,10 +70,13 @@ func status() {
 	if isRemote(device.Source) {
 		dir = cacheDir
 	}
-	if names, err := listMedia(dir); err != nil {
+	if names, unplayable, err := listMedia(dir); err != nil {
 		row("media", "%v", err)
 	} else {
 		row("media", "%d files in %s", len(names), dir)
+		if len(unplayable) > 0 {
+			row("", "%s", unplayableNote(unplayable))
+		}
 	}
 
 	show, err := loadShow(dir, device.baseShow())

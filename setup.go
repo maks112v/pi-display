@@ -247,11 +247,14 @@ func checkSource(ctx context.Context, d Device) error {
 		if !filepath.IsAbs(d.Source) {
 			return errors.New("local folder must be an absolute path")
 		}
-		names, err := listMedia(d.Source)
+		names, unplayable, err := listMedia(d.Source)
 		if err != nil {
 			return err
 		}
 		fmt.Printf("Found %d images and videos.\n", len(names))
+		if len(unplayable) > 0 {
+			fmt.Println(unplayableNote(unplayable))
+		}
 		return nil
 	}
 	return checkRemote(ctx, d)

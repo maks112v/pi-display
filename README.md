@@ -92,7 +92,7 @@ To build from source instead: `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o
 - The folder and `display.toml` are re-read before every file, so changes show up within one slide (plus up to 30 seconds of sync).
 - mpv does the decoding and draws straight to the screen with hardware decoding. `pi-display` decides what plays and for how long.
 
-Images: jpg, jpeg, png, webp, bmp, gif. Videos: mp4, m4v, mov, mkv, webm, avi. Videos play once through, then the slideshow moves on.
+Images: jpg, jpeg, png, webp, bmp, gif. Videos: mp4, m4v, mov, mkv, webm, avi. Videos play once through, then the slideshow moves on. Animated WebP (like GIPHY's) is skipped because Raspberry Pi OS can't decode it; use MP4 or GIF.
 
 ## display.toml
 
