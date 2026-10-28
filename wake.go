@@ -32,37 +32,59 @@ func (o override) screenOn(s *Schedule, now time.Time) bool {
 // off for that long (default 1h), whatever the schedule says. A duration of 0
 // cancels either.
 func setOverride(path string, on bool, arg string) error {
-	d := time.Hour
-	if arg == "" {
-		arg = "1h"
-	} else {
-		var err error
-		if d, err = time.ParseDuration(arg); err != nil || d < 0 {
-			return fmt.Errorf("%q is not a duration like 90m or 2h", arg)
-		}
+	d, label, err := overrideDuration(arg)
+	if err != nil {
+		return err
 	}
-	if d == 0 {
+	until := time.Now().Add(d)
+	if err := writeOverride(path, on, until, d == 0); err != nil {
+		return err
+	}
+	fmt.Println(describeOverride(on, label, until, d == 0) + ".")
+	return nil
+}
+
+// overrideDuration parses the duration of an on or off command, 1h when arg
+// is empty. label is how to say it back to someone.
+func overrideDuration(arg string) (d time.Duration, label string, err error) {
+	if arg == "" {
+		return time.Hour, "1h", nil
+	}
+	if d, err = time.ParseDuration(arg); err != nil || d < 0 {
+		return 0, "", fmt.Errorf("%q is not a duration like 90m or 2h", arg)
+	}
+	return d, arg, nil
+}
+
+// writeOverride saves an on or off override lasting until until, or removes
+// any override when clear is set.
+func writeOverride(path string, on bool, until time.Time, clear bool) error {
+	if clear {
 		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		fmt.Println("Override cleared. Back on schedule.")
 		return nil
 	}
-
 	state := "off"
 	if on {
 		state = "on"
 	}
-	until := time.Now().Add(d).Truncate(time.Second)
 	tmp := path + ".new"
-	if err := os.WriteFile(tmp, []byte(state+" "+until.Format(time.RFC3339)+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(tmp, []byte(state+" "+until.Truncate(time.Second).Format(time.RFC3339)+"\n"), 0o644); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		return err
+	return os.Rename(tmp, path)
+}
+
+func describeOverride(on bool, label string, until time.Time, clear bool) string {
+	if clear {
+		return "Override cleared. Back on schedule"
 	}
-	fmt.Printf("Screen %s for %s, until %s, then back on schedule.\n", state, arg, until.Format("Mon 15:04"))
-	return nil
+	state := "off"
+	if on {
+		state = "on"
+	}
+	return fmt.Sprintf("Screen %s for %s, until %s, then back on schedule", state, label, until.Format("Mon 15:04"))
 }
 
 // watchOverride signals on the returned channel when a `pi-display on|off`

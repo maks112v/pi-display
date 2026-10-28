@@ -143,6 +143,8 @@ pi-display on 0      # cancel either and go back to the schedule
 
 `on` also wakes a TV someone turned off with the remote, and `off` works with or without a schedule. A new command replaces the last one, takes effect within a second, and survives a reboot. Schedule changes and expired overrides take effect at the next slide. Set the Pi's timezone with `sudo raspi-config` so the schedule matches the wall clock.
 
+To switch every screen on a folder at once, save a `screen.txt` at the top of the folder containing one command, like `off 30m` or `on 2h`. Each Pi applies it once within about 30 seconds, timed from when the file was saved, so all screens switch back together and a Pi that was offline gets only the time that's left. Save the file again to send another command.
+
 ## Fixing a Pi on site
 
 If the Pi moves to a new building or the Wi-Fi changes, plug a keyboard into it and press **Ctrl+Alt+T**. The slideshow stops and the screen shows the console login. Log in with the Pi's account, then change Wi-Fi with `sudo raspi-config` (System Options, Wireless LAN). Ctrl+Alt+F1 through F12 work too.

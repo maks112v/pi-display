@@ -175,10 +175,10 @@ func syncOnce(ctx context.Context, d Device, dir string, logs *shareLog) error {
 	return err
 }
 
-// mirror makes dst match the media files and display.toml at the top level
-// of src (an SMB share or a public Drive folder). Files are compared by size
-// and mtime, downloaded to a hidden temp file, then renamed into place so the
-// player never sees a partial file. free reports the bytes available in dst;
+// mirror makes dst match the media files, display.toml, and screen.txt at the
+// top level of src (an SMB share or a public Drive folder). Files are compared
+// by size and mtime, downloaded to a hidden temp file, then renamed into place
+// so the player never sees a partial file. free reports the bytes available in dst;
 // a file is skipped rather than downloaded if it would leave less than
 // diskReserve free.
 func mirror(src fs.FS, dst string, free func(dir string) (uint64, error)) error {
@@ -254,7 +254,7 @@ func diskFree(dir string) (uint64, error) {
 // wanted rejects anything that could escape dst or isn't something we play.
 func wanted(name string) bool {
 	return fs.ValidPath(name) && !strings.ContainsAny(name, `/\`) && !strings.HasPrefix(name, ".") &&
-		(isMedia(name) || name == showFile)
+		(isMedia(name) || name == showFile || name == screenFile)
 }
 
 func download(src fs.FS, name, dst string, modTime time.Time) error {

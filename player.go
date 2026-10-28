@@ -267,6 +267,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 	bootWake := booted
 	var seen override // the last override read, to spot a new on or off command
 	interrupt := watchOverride(ctx, overridePath)
+	go watchScreenFile(ctx, dir)
 	var lastProblem, lastSkip string
 	report := func(problem string) {
 		if problem != "" && problem != lastProblem {

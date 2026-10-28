@@ -10,6 +10,7 @@ description: Where Pi Display keeps its program, settings, and media.
 | `/etc/systemd/system/pi-display.service` | The service that starts the slideshow at boot |
 | `/var/lib/pi-display/media` | The mirrored copy of an SMB or Drive folder |
 | `/var/lib/pi-display/override` | A `pi-display on` or `off` override and when it ends |
+| `/var/lib/pi-display/screen-applied` | The last `screen.txt` command this Pi applied, so each one runs once |
 | `/usr/share/plymouth/themes/pi-display` | The boot logo, on Pis with the boot splash |
 
 Setup also installs `mpv` and `v4l-utils` (for HDMI-CEC TV control) with apt, and may switch the Pi to boot to the console instead of a desktop. [Uninstall](/docs/uninstall) covers undoing both.
