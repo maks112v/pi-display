@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 )
 
@@ -119,7 +120,11 @@ func run(ctx context.Context) error {
 	defer toConsole()
 	go watchKeys(toConsole)
 
-	err = playFolder(slideshow, dir, device.baseShow(), firstRunSinceBoot(bootIDPath))
+	empty, err := writeEmptyScreen(filepath.Dir(socketPath), device.Source)
+	if err != nil {
+		return err
+	}
+	err = playFolder(slideshow, dir, empty, device.baseShow(), firstRunSinceBoot(bootIDPath))
 	if ctx.Err() != nil || slideshow.Err() == nil {
 		return err
 	}
@@ -132,13 +137,13 @@ func run(ctx context.Context) error {
 }
 
 // playFolder runs mpv on dir until ctx is done or playback fails, and waits
-// for mpv to exit before returning so the screen is free. booted is passed
-// through to play.
-func playFolder(ctx context.Context, dir string, base Show, booted bool) error {
+// for mpv to exit before returning so the screen is free. empty and booted
+// are passed through to play.
+func playFolder(ctx context.Context, dir, empty string, base Show, booted bool) error {
 	player, err := startMPV(ctx, socketPath)
 	if err != nil {
 		return err
 	}
 	defer player.close()
-	return play(ctx, player, dir, base, booted)
+	return play(ctx, player, dir, empty, base, booted)
 }

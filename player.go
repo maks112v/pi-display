@@ -220,14 +220,17 @@ func (m *mpv) drain() {
 }
 
 // play loops through dir forever, with base as the settings display.toml is
-// layered over. The folder, display.toml, and any `pi-display on|off` override are
-// re-read before every file, so changes show up without restarting anything.
+// layered over. While the folder has nothing to play, the image at empty is
+// shown instead. The folder, display.toml, and any `pi-display on|off`
+// override are re-read before every file, so changes show up without
+// restarting anything.
 // booted means the Pi just powered on, so the TV gets one wake over HDMI-CEC
 // if the screen should be on, even without tv_power, in case it came back up
 // in standby.
-func play(ctx context.Context, m *mpv, dir string, base Show, booted bool) error {
+func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool) error {
 	show := base
 	current := ""
+	showingEmpty := false
 	order := newPlayOrder()
 	screenOn := true
 	bootWake := booted
@@ -301,10 +304,19 @@ func play(ctx context.Context, m *mpv, dir string, base Show, booted bool) error
 		}
 		report(problem)
 
+		// With nothing to play the screen shows the empty screen, or goes
+		// black while it is off.
 		if len(names) == 0 {
-			if current != "" {
+			if current != "" || showingEmpty != screenOn {
 				current = ""
-				if err := m.command("stop"); err != nil {
+				showingEmpty = screenOn
+				var err error
+				if screenOn {
+					err = m.command("loadfile", empty, "replace")
+				} else {
+					err = m.command("stop")
+				}
+				if err != nil {
 					return err
 				}
 			}
@@ -328,7 +340,7 @@ func play(ctx context.Context, m *mpv, dir string, base Show, booted bool) error
 			}
 			continue
 		}
-		current = next
+		current, showingEmpty = next, false
 		if err := m.show(ctx, filepath.Join(dir, next), image, show.imageDuration(next)); err != nil {
 			return err
 		}
