@@ -185,6 +185,12 @@ func (m *mpv) show(ctx context.Context, path string, image bool, duration time.D
 		}
 		m.vf = vf
 	}
+	// --keep-open pauses mpv at the end of a video, and the pause carries
+	// over to the next file, which would leave the next video stuck on its
+	// first frame.
+	if err := m.command("set_property", "pause", false); err != nil {
+		return err
+	}
 	// Absolute paths keep mpv from treating a filename as a URL or protocol.
 	if err := m.command("loadfile", path, "replace"); err != nil {
 		return err
