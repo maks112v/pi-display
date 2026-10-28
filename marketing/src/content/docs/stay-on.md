@@ -18,16 +18,6 @@ Durations use Go's format: `90m`, `2h`, `1h30m`.
 
 A new command replaces the last one, takes effect within a second, and survives a reboot. When it runs out, the screen goes back to its schedule.
 
-## From the shared folder
+## Every screen at once
 
-To switch every screen that plays a folder at once, put a file named `screen.txt` at the top of the folder, next to `display.toml`, with one command in it:
-
-```text
-off 30m
-```
-
-`on 2h`, `off 1h30m`, and `on 0` (cancel and go back to the schedule) work the same way as on the command line. Each Pi picks it up within about 30 seconds and applies it once. To send another command, even the same one, save the file again.
-
-The duration counts from when the file was saved, so every screen switches back at the same time. A Pi that was offline gets only the time that's left, and one that comes back after the time is up ignores the command. Whichever is newer wins between `screen.txt` and someone running `pi-display on` or `off` on a Pi.
-
-Each Pi logs what it did, like `screen.txt: Screen off for 30m, until Tue 19:30, then back on schedule`, and a line it can't read is logged and ignored. On Google Drive, upload a plain `.txt` file; a Google Doc won't work.
+To switch every screen that plays a folder, put a one-line [screen.txt](/docs/screen-txt) in the folder instead of SSHing into each Pi. The [screen command generator](/screen) makes the file for you.

@@ -1,0 +1,77 @@
+---
+// Site footer: the logo and every page worth finding, grouped. Used by both
+// layouts. The link to the current page shows in white.
+import Logo from "./Logo.astro";
+
+const repo = "https://github.com/maks112v/pi-display";
+
+const groups = [
+  {
+    title: "Tools",
+    links: [
+      { label: "Install", href: "/install" },
+      { label: "Config generator", href: "/config" },
+      { label: "Screen command", href: "/screen" },
+    ],
+  },
+  {
+    title: "Docs",
+    links: [
+      { label: "Get started", href: "/docs" },
+      { label: "display.toml", href: "/docs/display-toml" },
+      { label: "Schedules", href: "/docs/schedules" },
+      { label: "screen.txt", href: "/docs/screen-txt" },
+      { label: "Commands", href: "/docs/commands" },
+      { label: "Logs", href: "/docs/logs" },
+    ],
+  },
+  {
+    title: "Media folder",
+    links: [
+      { label: "SMB share", href: "/docs/smb" },
+      { label: "Google Drive", href: "/docs/google-drive" },
+      { label: "Local folder", href: "/docs/local-folder" },
+      { label: "Supported files", href: "/docs/supported-files" },
+    ],
+  },
+  {
+    title: "Project",
+    links: [
+      { label: "GitHub", href: repo },
+      { label: "Releases", href: `${repo}/releases` },
+      { label: "Report an issue", href: `${repo}/issues` },
+      { label: "License", href: `${repo}/blob/main/LICENSE.md` },
+    ],
+  },
+];
+
+const current = Astro.url.pathname.replace(/\/$/, "") || "/";
+---
+
+<footer class="flex flex-col gap-10 border-t border-line pt-12 pb-12 md:flex-row md:justify-between md:pt-14 md:pb-16">
+  <div class="flex flex-col gap-4 md:w-[280px]">
+    <a href="/" class="flex items-center gap-2.5 text-[17px] font-semibold">
+      <Logo size={28} />
+      Pi Display
+    </a>
+    <p class="text-sm text-muted">Simple digital signage for any TV.</p>
+  </div>
+  <div class="grid grid-cols-2 gap-x-6 gap-y-10 md:flex md:gap-14">
+    {
+      groups.map(({ title, links }) => (
+        <div class="flex flex-col gap-3 md:w-[140px]">
+          <span class="pb-1 text-xs font-medium text-faint">{title}</span>
+          {links.map(({ label, href }) => (
+            <a
+              href={href}
+              aria-current={href === current ? "page" : undefined}
+              class="text-sm text-muted hover:text-fg aria-[current=page]:text-fg"
+            >
+              {label}
+            </a>
+          ))}
+        </div>
+      ))
+    }
+  </div>
+</footer>

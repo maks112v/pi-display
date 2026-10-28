@@ -5,6 +5,7 @@ import type { MarkdownHeading } from "astro";
 import "../styles/global.css";
 import DocsSearch from "../components/DocsSearch";
 import DocsSidebar from "../components/DocsSidebar.astro";
+import Footer from "../components/Footer.astro";
 import Logo from "../components/Logo.astro";
 import ShareMeta from "../components/ShareMeta.astro";
 import { searchIndex, type DocPage } from "../lib/docs";
@@ -115,6 +116,8 @@ const title = page.id === "index" ? "Docs Â· Pi Display" : `${page.data.title} Â
         </a>
       </aside>
     </div>
+
+    <div class="px-5 lg:px-8"><Footer /></div>
 
     <script>
       // Copy buttons on code blocks (added at build time in astro.config.mjs).

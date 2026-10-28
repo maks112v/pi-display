@@ -5,7 +5,7 @@ import { getCollection, render, type CollectionEntry } from "astro:content";
 export const nav = [
   { group: "Get started", slugs: ["index", "prepare-the-pi", "install", "run-setup"] },
   { group: "Media", slugs: ["smb", "google-drive", "local-folder", "supported-files"] },
-  { group: "Configure", slugs: ["display-toml", "schedules", "stay-on"] },
+  { group: "Configure", slugs: ["display-toml", "schedules", "stay-on", "screen-txt"] },
   { group: "Operate", slugs: ["commands", "on-site", "updating", "logs", "files", "uninstall"] },
 ] as const;
 

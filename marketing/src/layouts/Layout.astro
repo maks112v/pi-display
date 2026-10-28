@@ -1,6 +1,7 @@
 ---
 // Shared page shell: document head, nav, and the centered content column.
 import "../styles/global.css";
+import Footer from "../components/Footer.astro";
 import Logo from "../components/Logo.astro";
 import ShareMeta from "../components/ShareMeta.astro";
 
@@ -29,7 +30,7 @@ const links = [
     <ShareMeta title={title} description={description} />
   </head>
   <body class="bg-bg font-sans text-fg antialiased">
-    <div class="mx-auto max-w-[1168px] px-6 pb-24">
+    <div class="mx-auto max-w-[1168px] px-6">
       <nav class="flex items-center justify-between gap-6 border-b border-line py-5">
         <a href="/" class="flex shrink-0 items-center gap-2.5 font-semibold whitespace-nowrap">
           <Logo />
@@ -49,7 +50,8 @@ const links = [
           </div>
         </div>
       </nav>
-      <slot />
+      <div class="pb-24"><slot /></div>
+      <Footer />
     </div>
   </body>
 </html>

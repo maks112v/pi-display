@@ -21,6 +21,7 @@ import {
   Segmented,
   Switch,
   Wizard,
+  download,
   input,
   primaryButton,
   smallButton,
@@ -231,12 +232,7 @@ function DownloadButton({ name, text }: { name: string; text: string }) {
     <button
       type="button"
       className={`${smallButton} flex items-center gap-1.5 bg-fg text-bg hover:bg-muted`}
-      onClick={() => {
-        const url = URL.createObjectURL(new Blob([text], { type: "application/toml" }));
-        const link = Object.assign(document.createElement("a"), { href: url, download: name });
-        link.click();
-        URL.revokeObjectURL(url);
-      }}
+      onClick={() => download(name, text)}
     >
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
         <path d="M6 1.5 V8 M3 5.5 L6 8.5 L9 5.5 M2 10.5 H10" stroke="currentColor" strokeWidth="1.4" />

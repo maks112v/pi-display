@@ -255,6 +255,13 @@ export function Output({ label, action, children }: { label: ReactNode; action: 
 
 export const smallButton = "rounded-[5px] px-3 py-1.5 text-[13px] font-medium";
 
+// Saves text as a file named name, built in the browser.
+export function download(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  Object.assign(document.createElement("a"), { href: url, download: name }).click();
+  URL.revokeObjectURL(url);
+}
+
 export function CopyButton({ text, secondary = false }: { text: string; secondary?: boolean }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {

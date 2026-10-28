@@ -1,0 +1,15 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ScreenCommand from "../components/ScreenCommand";
+---
+
+<Layout
+  title="Screen command · Pi Display"
+  description="Turn every screen on a folder on or off for a while: download a one-line screen.txt and drop it in your media folder."
+>
+  <header class="flex flex-col gap-3 pt-20 pb-14">
+    <h1 class="text-[40px] leading-12 font-semibold tracking-[-0.03em]">Screen command</h1>
+    <p class="text-base text-muted">Turn every screen on or off for a while. Download the file and drop it in your media folder.</p>
+  </header>
+  <ScreenCommand client:load />
+</Layout>
