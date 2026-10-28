@@ -144,7 +144,11 @@ func setup(ctx context.Context, code string) error {
 	if err := runCmd("systemctl", "enable", "pi-display"); err != nil {
 		return err
 	}
-	// The boot logo is cosmetic, so a failure here doesn't fail setup.
+	// Neither of these is needed for the slideshow, so a failure doesn't
+	// fail setup.
+	if err := wifiRetryForever(); err != nil {
+		fmt.Println("Couldn't set Wi-Fi to retry forever:", err)
+	}
 	if err := installSplash(); err != nil {
 		fmt.Println("Skipped the boot logo:", err)
 	}
@@ -332,6 +336,33 @@ func replaceBinary(data []byte) error {
 	if err := os.Rename(tmp, binPath); err != nil {
 		_ = os.Remove(tmp)
 		return err
+	}
+	return nil
+}
+
+// wifiRetryForever makes NetworkManager keep trying every saved Wi-Fi
+// network instead of giving up after 4 tries. Otherwise a Pi that boots
+// faster than the router after a power cut stays offline. NetworkManager.conf
+// has no setting for this, so it is set on each network saved now; networks
+// added later need it set by hand (see the on-site docs). Older Raspberry Pi
+// OS without NetworkManager already retries forever.
+func wifiRetryForever() error {
+	if _, err := exec.LookPath("nmcli"); err != nil {
+		return nil
+	}
+	out, err := exec.Command("nmcli", "-g", "UUID,TYPE", "connection", "show").Output()
+	if err != nil {
+		return fmt.Errorf("nmcli connection show: %w", err)
+	}
+	for line := range strings.Lines(string(out)) {
+		uuid, kind, _ := strings.Cut(strings.TrimSpace(line), ":")
+		if kind != "802-11-wireless" {
+			continue
+		}
+		// Changes the saved profile only, so an active connection stays up.
+		if err := runCmd("nmcli", "connection", "modify", uuid, "connection.autoconnect-retries", "0"); err != nil {
+			return err
+		}
 	}
 	return nil
 }

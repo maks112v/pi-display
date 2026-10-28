@@ -42,7 +42,8 @@ Run it with `sudo` from your normal user, not as root. The slideshow runs as tha
 3. Installs mpv if it is missing.
 4. Installs itself to `/usr/local/bin/pi-display` and adds a service that starts the slideshow on every boot. You can delete the downloaded `./pi-display` afterwards.
 5. If the Pi boots to a desktop, offers to boot to console instead. Say yes: the slideshow needs the screen to itself.
-6. If the Pi has the boot splash (the desktop image does), sets the boot logo to the Pi Display icon. On Raspberry Pi OS Lite this step is skipped.
+6. Sets saved Wi-Fi networks to keep reconnecting forever, so a Pi that boots before the router after a power cut still gets back online. Networks added later need the same: `sudo nmcli connection modify "<network name>" connection.autoconnect-retries 0`
+7. If the Pi has the boot splash (the desktop image does), sets the boot logo to the Pi Display icon. On Raspberry Pi OS Lite this step is skipped.
 
 To skip the questions, use the install page on the website and run the command it gives you: `sudo ./pi-display setup <code>`. The code carries the folder and login, and setup turns the desktop off at boot without asking. It includes the password encoded, not encrypted, so treat it like the password.
 

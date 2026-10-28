@@ -18,7 +18,8 @@ Run it with `sudo` from your normal user, not as root. The slideshow runs as tha
 3. Installs mpv, the video player, and v4l-utils, which turns the TV off and on with the [schedule](/docs/schedules), if they are missing.
 4. Installs itself to `/usr/local/bin/pi-display` and adds a service that starts the slideshow on every boot. You can delete the downloaded `./pi-display` afterwards.
 5. If the Pi boots to a desktop, offers to boot to the console instead. Say yes: the slideshow needs the screen to itself. You can still open the desktop later with `sudo pi-display desktop`. See [Fixing a Pi on site](/docs/on-site#the-desktop).
-6. If the Pi has the boot splash (the desktop image does), sets the boot logo to the Pi Display icon. On Raspberry Pi OS Lite this step is skipped.
+6. Sets saved Wi-Fi networks to keep reconnecting forever, so a Pi that boots before the router after a power cut still gets back online. Networks added later need the same. See [Fixing a Pi on site](/docs/on-site).
+7. If the Pi has the boot splash (the desktop image does), sets the boot logo to the Pi Display icon. On Raspberry Pi OS Lite this step is skipped.
 
 The slideshow starts as soon as setup finishes.
 

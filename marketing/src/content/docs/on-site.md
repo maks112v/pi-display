@@ -7,7 +7,7 @@ When a Pi moves to a new building or the Wi-Fi changes, it can't be reached over
 
 1. Plug a USB keyboard into the Pi and press **Ctrl+Alt+T**. Ctrl+Alt+F1 through F12 work too.
 2. The slideshow stops and the screen shows the console login. Press Enter if you don't see a prompt, then log in with the Pi's account.
-3. Change Wi-Fi with `sudo raspi-config`, under System Options, Wireless LAN.
+3. Change Wi-Fi with `sudo raspi-config`, under System Options, Wireless LAN. Then make the new network reconnect forever after a power cut, like setup does: `sudo nmcli connection modify "<network name>" connection.autoconnect-retries 0`
 4. Bring the slideshow back:
 
 ```sh
