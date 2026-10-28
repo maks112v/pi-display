@@ -222,11 +222,15 @@ func (m *mpv) drain() {
 // play loops through dir forever, with base as the settings display.toml is
 // layered over. The folder, display.toml, and any `pi-display on|off` override are
 // re-read before every file, so changes show up without restarting anything.
-func play(ctx context.Context, m *mpv, dir string, base Show) error {
+// booted means the Pi just powered on, so the TV gets one wake over HDMI-CEC
+// if the screen should be on, even without tv_power, in case it came back up
+// in standby.
+func play(ctx context.Context, m *mpv, dir string, base Show, booted bool) error {
 	show := base
 	current := ""
 	order := newPlayOrder()
 	screenOn := true
+	bootWake := booted
 	var seen override // the last override read, to spot a new on or off command
 	var lastProblem string
 	report := func(problem string) {
@@ -264,7 +268,9 @@ func play(ctx context.Context, m *mpv, dir string, base Show) error {
 		o := readOverride(overridePath)
 		fresh := o != seen && o.active(now)
 		seen = o
-		if on := o.screenOn(show.Schedule, now); on != screenOn || fresh {
+		if on := o.screenOn(show.Schedule, now); on != screenOn || fresh || bootWake {
+			wake := bootWake && on
+			bootWake = false
 			screenOn = on
 			switch until := o.Until.Format("Mon 15:04"); {
 			case o.active(now) && on:
@@ -276,7 +282,7 @@ func play(ctx context.Context, m *mpv, dir string, base Show) error {
 			default:
 				log.Print("screen off until the schedule turns it back on")
 			}
-			if show.TVPower {
+			if show.TVPower || wake {
 				if err := setTVPower(ctx, on); err != nil {
 					log.Printf("couldn't switch the TV over HDMI-CEC: %v", err)
 				}

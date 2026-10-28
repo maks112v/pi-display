@@ -130,7 +130,7 @@ If the Pi was set up with a setup code, its slideshow settings are the starting 
 
 ## Turning the screen on or off
 
-Outside the schedule the screen shows black, and with `tv_power` (on by default) the Pi puts the TV in standby over HDMI-CEC and wakes it when the schedule comes back. The TV needs CEC turned on in its settings, often under a brand name like Anynet+, Bravia Sync, or SimpLink. Set `tv_power = false` to leave the TV alone.
+Outside the schedule the screen shows black, and with `tv_power` (on by default) the Pi puts the TV in standby over HDMI-CEC and wakes it when the schedule comes back. The TV needs CEC turned on in its settings, often under a brand name like Anynet+, Bravia Sync, or SimpLink. Set `tv_power = false` to leave the TV alone. Either way, when the Pi powers on during the schedule it sends one wake over HDMI-CEC, in case the TV came back from a power cut in standby.
 
 To override the schedule for a while, SSH in and run:
 

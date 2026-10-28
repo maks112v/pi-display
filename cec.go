@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -50,6 +53,23 @@ func tvPower(ctx context.Context, dev string, on bool) error {
 		_, err = cecCtl(ctx, dev, "--to", "15", "--active-source", "phys-addr="+addr)
 	}
 	return err
+}
+
+// firstRunSinceBoot reports whether this is the first run since the Pi
+// booted, by comparing the kernel's boot ID with the one saved at path, and
+// saves the current one. It is false if the boot ID can't be read.
+func firstRunSinceBoot(path string) bool {
+	id, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
+	if err != nil {
+		return false
+	}
+	if last, err := os.ReadFile(path); err == nil && bytes.Equal(last, id) {
+		return false
+	}
+	if err := os.WriteFile(path, id, 0o644); err != nil {
+		log.Printf("couldn't save the boot ID: %v", err)
+	}
+	return true
 }
 
 func cecCtl(ctx context.Context, dev string, args ...string) (string, error) {

@@ -119,7 +119,7 @@ func run(ctx context.Context) error {
 	defer toConsole()
 	go watchKeys(toConsole)
 
-	err = playFolder(slideshow, dir, device.baseShow())
+	err = playFolder(slideshow, dir, device.baseShow(), firstRunSinceBoot(bootIDPath))
 	if ctx.Err() != nil || slideshow.Err() == nil {
 		return err
 	}
@@ -132,12 +132,13 @@ func run(ctx context.Context) error {
 }
 
 // playFolder runs mpv on dir until ctx is done or playback fails, and waits
-// for mpv to exit before returning so the screen is free.
-func playFolder(ctx context.Context, dir string, base Show) error {
+// for mpv to exit before returning so the screen is free. booted is passed
+// through to play.
+func playFolder(ctx context.Context, dir string, base Show, booted bool) error {
 	player, err := startMPV(ctx, socketPath)
 	if err != nil {
 		return err
 	}
 	defer player.close()
-	return play(ctx, player, dir, base)
+	return play(ctx, player, dir, base, booted)
 }

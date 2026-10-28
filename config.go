@@ -24,6 +24,9 @@ const (
 	// overridePath holds a `pi-display on` or `off` override and when it
 	// ends. It lives in the state directory so it survives a reboot.
 	overridePath = "/var/lib/pi-display/override"
+	// bootIDPath holds the kernel boot ID of the last run, so a fresh boot
+	// can be told apart from a service restart.
+	bootIDPath = "/var/lib/pi-display/boot_id"
 
 	// showFile is the optional slideshow config inside the media folder.
 	showFile    = "display.toml"
