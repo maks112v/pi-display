@@ -1,20 +1,6 @@
 // pi-display turns a Raspberry Pi into a full-screen slideshow of the images
 // and videos in a folder, either local or mirrored from an SMB share or a
-// public Google Drive folder.
-//
-//	sudo pi-display setup [code]  # one-time: pick the source, install the boot service
-//	                              # (code comes from the website's install page and skips the prompts)
-//	sudo pi-display config <code> # apply slideshow settings from the web config generator
-//	pi-display run                # what the service runs
-//	pi-display on [2h]            # screen on for a while, whatever the schedule says (0 cancels)
-//	pi-display off [2h]           # screen and TV off for a while (0 cancels)
-//	sudo pi-display start         # restart the slideshow, after the console or desktop
-//	sudo pi-display desktop       # stop the slideshow and start the desktop until reboot
-//	sudo pi-display update        # install the latest release and restart
-//	sudo pi-display uninstall     # remove the service, program, settings, and media
-//	pi-display status             # version, source, service health, and screen state
-//	pi-display logs               # follow the service's logs (journalctl -u pi-display -f)
-//	pi-display version
+// public Google Drive folder. usage below lists the commands.
 package main
 
 import (
@@ -29,6 +15,33 @@ import (
 	"path/filepath"
 	"syscall"
 )
+
+// usage is the help text, printed by `pi-display help` and for an unknown or
+// missing command.
+const usage = `Pi Display: a full-screen slideshow of a folder of images and videos.
+
+Usage: pi-display <command> [argument]
+
+Screen
+  on [2h]          Screen and TV on for a while, whatever the schedule says (0 cancels)
+  off [2h]         Screen and TV off for a while (0 cancels)
+  start            Restart the slideshow after the console or desktop (sudo)
+  desktop          Stop the slideshow and start the desktop until reboot (sudo)
+
+Check
+  status           Version, source, service health, and screen state
+  logs             Follow the slideshow's logs
+  version          Print the version
+
+Set up
+  setup [code]     Pick the media source and install the boot service (sudo)
+                   A code from the website's install page skips the prompts
+  config <code>    Apply slideshow settings from the website's config page (sudo)
+  update           Install the latest release and restart (sudo)
+  uninstall        Remove the service, program, settings, and media (sudo)
+
+Docs: https://pi-display.maks112v.com/docs
+`
 
 func main() {
 	log.SetFlags(0) // journald adds timestamps
@@ -60,8 +73,13 @@ func main() {
 		err = followLogs()
 	case "version":
 		fmt.Println(version)
+	case "help", "-h", "--help":
+		fmt.Print(usage)
 	default:
-		fmt.Fprintln(os.Stderr, "usage: pi-display <setup [code]|config <code>|run|on|off [duration]|start|desktop|update|uninstall|status|logs|version>")
+		if command != "" {
+			fmt.Fprintf(os.Stderr, "pi-display: unknown command %q\n\n", command)
+		}
+		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
 	}
 	if err != nil && !errors.Is(err, context.Canceled) {
