@@ -51,7 +51,7 @@ The slideshow starts as soon as setup finishes, and again whenever the Pi gets p
 
 ### 4. Add media
 
-Put images and videos in the folder. New files show up within about 30 seconds. To change timing, add a [`display.toml`](#displaytoml) to the same folder. The config generator on the website builds one for you.
+Put images and videos in the folder. New files show up within about a minute for SMB and Drive, and within a second for a local folder. To change timing, add a [`display.toml`](#displaytoml) to the same folder. The config generator on the website builds one for you.
 
 ## Day to day
 
@@ -85,11 +85,12 @@ To build from source instead: `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o
 
 ## How it works
 
-- SMB and Drive folders are mirrored into `/var/lib/pi-display/media` every 30 seconds. Playback runs from that copy, so the slideshow starts at boot before the network is up and keeps going if the source goes offline. Make sure the SD card has room for the whole folder. A file that would leave less than 256 MB free is skipped and logged instead of filling the card; the rest of the folder keeps syncing.
+- SMB and Drive folders are mirrored into `/var/lib/pi-display/media` every 30 seconds, on the minute and half minute. Playback runs from that copy, so the slideshow starts at boot before the network is up and keeps going if the source goes offline. Make sure the SD card has room for the whole folder. A file that would leave less than 256 MB free is skipped and logged instead of filling the card; the rest of the folder keeps syncing.
 - Drive is read through its public folder view and download links, not the API, so Google can break it by changing those pages. Native Google Docs are ignored. If two files share a name, the first one listed wins.
 - Only files at the top level of the folder are used. Subfolders and hidden files are ignored.
-- Order is natural filename order: `2.jpg` plays before `10.jpg`. With `shuffle = true`, every file plays once per loop in a new random order each time, and the last file of one loop never plays first in the next.
-- The folder and `display.toml` are re-read before every file, so changes show up within one slide (plus up to 30 seconds of sync).
+- Order is natural filename order: `2.jpg` plays before `10.jpg`. With `shuffle = true`, every file plays once per loop in a new random order each time (the same order on every screen), and the last file of one loop never plays first in the next.
+- The folder and `display.toml` are checked every second. A change that moves what should be on screen (a file added or removed, a new duration, shuffle turned on) cuts off whatever is playing and jumps straight to the new spot, so all screens switch together.
+- Screens on the same folder stay in step without talking to each other. Playback follows the Pi's network-synced clock: the folder loops back to back from a fixed point in time, each image taking its duration and each video its length, so every Pi works out the same file at the same moment. A Pi that boots or falls behind joins at the right spot, partway into a video if need be. A new SMB or Drive file waits until it is a minute old before playing, so every Pi has synced it and they all add it together. A deleted file likewise keeps playing until a minute after the deletion, then drops out on every screen at once. SMB times the deletion from when the share folder changed. Drive folders don't record that, so every Pi syncs on the same clock ticks (:00 and :30) and times it from the tick that noticed it. A Pi that can't reach the network at boot plays out of step until its clock is set.
 - mpv does the decoding and draws straight to the screen with hardware decoding. `pi-display` decides what plays and for how long.
 
 Images: jpg, jpeg, png, webp, bmp, gif. Videos: mp4, m4v, mov, mkv, webm, avi. Videos play once through, then the slideshow moves on. Animated WebP (like GIPHY's) is skipped because Raspberry Pi OS can't decode it; use MP4 or GIF.

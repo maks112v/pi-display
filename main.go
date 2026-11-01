@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
 // usage is the help text, printed by `pi-display help` and for an unknown or
@@ -114,8 +115,9 @@ func run(ctx context.Context) error {
 	}
 
 	dir := device.Source
+	var settle time.Duration // a local folder has only this Pi to keep in step with
 	if isRemote(device.Source) {
-		dir = cacheDir
+		dir, settle = cacheDir, settleTime
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
@@ -142,7 +144,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = playFolder(slideshow, dir, empty, device.baseShow(), firstRunSinceBoot(bootIDPath))
+	err = playFolder(slideshow, dir, empty, device.baseShow(), settle, firstRunSinceBoot(bootIDPath))
 	if ctx.Err() != nil || slideshow.Err() == nil {
 		return err
 	}
@@ -155,13 +157,13 @@ func run(ctx context.Context) error {
 }
 
 // playFolder runs mpv on dir until ctx is done or playback fails, and waits
-// for mpv to exit before returning so the screen is free. empty and booted
-// are passed through to play.
-func playFolder(ctx context.Context, dir, empty string, base Show, booted bool) error {
+// for mpv to exit before returning so the screen is free. empty, settle, and
+// booted are passed through to play.
+func playFolder(ctx context.Context, dir, empty string, base Show, settle time.Duration, booted bool) error {
 	player, err := startMPV(ctx, socketPath)
 	if err != nil {
 		return err
 	}
 	defer player.close()
-	return play(ctx, player, dir, empty, base, booted)
+	return play(ctx, player, dir, empty, base, settle, booted)
 }

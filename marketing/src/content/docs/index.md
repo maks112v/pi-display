@@ -7,8 +7,9 @@ Pi Display plays every image and video in a folder, full screen, in filename ord
 
 ## How it fits together
 
-- **You keep the media where you already work.** Drop files into the shared folder from any computer. Each screen picks up changes within about 30 seconds.
+- **You keep the media where you already work.** Drop files into the shared folder from any computer. Each screen picks up changes within about a minute.
 - **Each Pi keeps its own copy.** Files are mirrored onto the SD card, so the slideshow starts at boot before the network is up and keeps playing if the share goes offline.
+- **Screens stay in step.** Every screen on the same folder shows the same file at the same moment, timed by the clock each Pi syncs over the network.
 - **One file controls playback.** An optional [display.toml](/docs/display-toml) in the folder sets timing, fit, shuffle, and screen hours for every screen that plays from it.
 
 ## Set up a screen

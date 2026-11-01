@@ -31,8 +31,8 @@ Use an account that can read the folder. If it can also write, each screen keeps
 
 Every 30 seconds the Pi mirrors the share into `/var/lib/pi-display/media` and plays from that copy:
 
-- New and changed files show up within about 30 seconds.
-- Deleted files are removed from the Pi.
+- New files start playing about a minute after they are saved, so every screen on the share has them and they all start them together. Changed files show up within about 30 seconds.
+- Deleted files stop playing about a minute after they are deleted, on every screen at once.
 - If the share is offline, the screen keeps playing what it already has.
 
 Make sure the SD card has room for the whole folder. A file that would leave less than 256 MB free is skipped and logged, and the rest of the folder keeps syncing.

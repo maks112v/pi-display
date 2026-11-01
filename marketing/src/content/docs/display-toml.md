@@ -3,7 +3,7 @@ title: display.toml
 description: Change timing, fit, and hours for every screen that plays from a folder, without touching the Pis.
 ---
 
-The [config generator](/config) builds this file for you. Drop it into the media folder as `display.toml`. Each Pi re-reads it before every slide, so changes show up within one slide, plus up to 30 seconds of sync for SMB and Drive.
+The [config generator](/config) builds this file for you. Drop it into the media folder as `display.toml`. Each Pi checks it every second and applies changes right away, cutting off the current slide, plus up to 30 seconds of sync for SMB and Drive.
 
 ```toml
 image_seconds = 10

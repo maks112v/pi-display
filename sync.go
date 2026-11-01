@@ -110,6 +110,12 @@ func (s shareFS) Open(name string) (fs.File, error) {
 	return s.share.Open(path.Join(s.dir, name))
 }
 
+// Stat lets mirror read when the folder last changed, which is when a deleted
+// file went away.
+func (s shareFS) Stat(name string) (fs.FileInfo, error) {
+	return s.share.Stat(path.Join(s.dir, name))
+}
+
 func (s shareFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	infos, err := s.share.ReadDir(path.Join(s.dir, name))
 	if err != nil {
@@ -141,34 +147,56 @@ func (s shareFS) appendFile(name string, data []byte, maxSize int64) error {
 	return err
 }
 
-// syncLoop mirrors the source every syncInterval. logs, when set, is pushed
-// to the source after each sync; it is nil for sources that can't be written.
+// syncLoop mirrors the source every syncInterval, and in between removes
+// deleted files right when they are due (see mirror). Syncs land on the same
+// clock ticks (:00 and :30) on every Pi, so they all list the source at the
+// same moment and notice a deletion on the same tick. logs, when set, is
+// pushed to the source after each sync; it is nil for sources that can't be
+// written.
 func syncLoop(ctx context.Context, d Device, dir string, logs *shareLog) {
 	var lastErr string
+	removing := map[string]time.Time{}
+	var tick time.Time // the tick this sync belongs to; zero for the first, at startup
+	next := time.Now()
 	for {
-		err := syncOnce(ctx, d, dir, logs)
-		if msg := fmt.Sprint(err); err != nil && msg != lastErr {
-			log.Printf("sync: %v", err)
-			lastErr = msg
-		} else if err == nil && lastErr != "" {
-			log.Print("sync: recovered")
-			lastErr = ""
+		if !time.Now().Before(next) {
+			err := syncOnce(ctx, d, dir, logs, removing, tick)
+			tick = time.Now().Truncate(syncInterval).Add(syncInterval)
+			next = tick
+			if msg := fmt.Sprint(err); err != nil && msg != lastErr {
+				log.Printf("sync: %v", err)
+				lastErr = msg
+			} else if err == nil && lastErr != "" {
+				log.Print("sync: recovered")
+				lastErr = ""
+			}
+		}
+		wait := time.Until(next)
+		for name, at := range removing {
+			if until := time.Until(at); until <= 0 {
+				if err := os.RemoveAll(filepath.Join(dir, name)); err != nil {
+					log.Printf("sync: %v", err)
+				}
+				delete(removing, name)
+			} else {
+				wait = min(wait, until)
+			}
 		}
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(syncInterval):
+		case <-time.After(wait):
 		}
 	}
 }
 
-func syncOnce(ctx context.Context, d Device, dir string, logs *shareLog) error {
+func syncOnce(ctx context.Context, d Device, dir string, logs *shareLog, removing map[string]time.Time, tick time.Time) error {
 	src, closeFn, err := connect(ctx, d)
 	if err != nil {
 		return err
 	}
 	defer closeFn()
-	err = mirror(src, dir, diskFree)
+	err = mirror(src, dir, diskFree, removing, tick, time.Now())
 	if dst, ok := src.(appender); ok && logs != nil {
 		logs.flush(dst)
 	}
@@ -181,7 +209,16 @@ func syncOnce(ctx context.Context, d Device, dir string, logs *shareLog) error {
 // so the player never sees a partial file. free reports the bytes available in dst;
 // a file is skipped rather than downloaded if it would leave less than
 // diskReserve free.
-func mirror(src fs.FS, dst string, free func(dir string) (uint64, error)) error {
+//
+// A file deleted from the source stays until settleTime after it was
+// deleted, as far as any Pi can tell: when the source folder last changed
+// (SMB), or else the sync tick that first noticed it (Drive, whose folders
+// don't record changes). removing holds those files and when each is due,
+// for syncLoop to remove on time. That way every Pi on the folder drops it at
+// the same moment instead of whenever its own sync notices, and their
+// timelines stay the same. With neither time (a Drive folder's first sync at
+// startup) deleted files go right away.
+func mirror(src fs.FS, dst string, free func(dir string) (uint64, error), removing map[string]time.Time, tick, now time.Time) error {
 	entries, err := fs.ReadDir(src, ".")
 	if err != nil {
 		return err
@@ -215,11 +252,36 @@ func mirror(src fs.FS, dst string, free func(dir string) (uint64, error)) error 
 	if err != nil {
 		return errors.Join(append(errs, err)...)
 	}
+	changed := tick
+	if info, err := fs.Stat(src, "."); err == nil && !info.ModTime().IsZero() {
+		changed = info.ModTime()
+		if changed.After(now) {
+			changed = now // the source's clock is ahead
+		}
+	}
+	for name := range removing {
+		if keep[name] {
+			delete(removing, name) // put back before it was due
+		}
+	}
 	for _, e := range locals {
-		if !keep[e.Name()] {
-			if err := os.RemoveAll(filepath.Join(dst, e.Name())); err != nil {
-				errs = append(errs, err)
+		name := e.Name()
+		if keep[name] {
+			continue
+		}
+		if wanted(name) && !changed.IsZero() {
+			// The first sighting sets the time, so later changes to the
+			// folder don't push it back.
+			if _, ok := removing[name]; !ok {
+				removing[name] = changed.Add(settleTime)
 			}
+			if now.Before(removing[name]) {
+				continue
+			}
+		}
+		delete(removing, name)
+		if err := os.RemoveAll(filepath.Join(dst, name)); err != nil {
+			errs = append(errs, err)
 		}
 	}
 

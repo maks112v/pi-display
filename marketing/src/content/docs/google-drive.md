@@ -25,6 +25,8 @@ Paste it when setup asks for the media folder.
 
 Like [SMB shares](/docs/smb), the folder is mirrored onto the Pi every 30 seconds and played from that copy, so the slideshow keeps going if the internet drops.
 
+New files start playing about a minute after they are saved, and deleted files stop about a minute after they are deleted, on every screen at once.
+
 ## Limits
 
 - Only files at the top of the folder are used. Subfolders are skipped.

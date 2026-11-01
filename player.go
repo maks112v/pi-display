@@ -79,15 +79,13 @@ func waitForDisplay(ctx context.Context) (device, connector string, err error) {
 }
 
 func startMPV(ctx context.Context, socket string) (*mpv, error) {
-	_ = os.Remove(socket)
-	args := []string{
-		"--no-config", // ignore any mpv.conf or scripts lying around
-		"--load-scripts=no",
-		"--ytdl=no",
-		"--idle=yes",
+	device, connector, err := waitForDisplay(ctx)
+	if err != nil {
+		return nil, err
+	}
+	m, err := launchMPV(ctx, socket,
 		"--force-window=yes",
 		"--fullscreen",
-		"--no-terminal",
 		"--osc=no",
 		"--osd-level=0",
 		"--cursor-autohide=always",
@@ -99,19 +97,38 @@ func startMPV(ctx context.Context, socket string) (*mpv, error) {
 		"--profile=fast",
 		"--keep-open=yes", // hold a video's last frame until the next file replaces it
 		"--image-display-duration=inf",
-		"--input-ipc-server=" + socket,
-	}
-	device, connector, err := waitForDisplay(ctx)
+		"--drm-device="+device,
+		"--drm-connector="+connector,
+	)
 	if err != nil {
 		return nil, err
 	}
-	args = append(args, "--drm-device="+device, "--drm-connector="+connector)
+	if err := m.command("observe_property", 1, "eof-reached"); err != nil {
+		m.close()
+		return nil, err
+	}
+	return m, nil
+}
+
+// launchMPV starts an idle mpv with args on top of the settings every mpv
+// here shares, and connects to it over socket.
+func launchMPV(ctx context.Context, socket string, args ...string) (*mpv, error) {
+	_ = os.Remove(socket)
+	args = append([]string{
+		"--no-config", // ignore any mpv.conf or scripts lying around
+		"--load-scripts=no",
+		"--ytdl=no",
+		"--idle=yes",
+		"--no-terminal",
+		"--input-ipc-server=" + socket,
+	}, args...)
 	cmd := exec.CommandContext(ctx, "mpv", args...)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start mpv: %w", err)
 	}
 
 	var conn net.Conn
+	var err error
 	for range 100 {
 		if conn, err = net.Dial("unix", socket); err == nil {
 			break
@@ -120,16 +137,49 @@ func startMPV(ctx context.Context, socket string) (*mpv, error) {
 	}
 	if err != nil {
 		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
 		return nil, fmt.Errorf("connect to mpv: %w", err)
 	}
 
 	m := &mpv{cmd: cmd, conn: conn, events: make(chan mpvEvent, 64)}
 	go m.readEvents()
-	if err := m.command("observe_property", 1, "eof-reached"); err != nil {
-		m.close()
-		return nil, err
-	}
 	return m, nil
+}
+
+// probeDuration reads how long the video at path runs, using a separate
+// paused mpv with no video or audio output so the screen is untouched. It is
+// rounded to the millisecond so every Pi gets the same timeline.
+func probeDuration(ctx context.Context, path string) (time.Duration, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	m, err := launchMPV(ctx, filepath.Join(filepath.Dir(socketPath), "probe.sock"), "--vo=null", "--ao=null", "--pause")
+	if err != nil {
+		return 0, err
+	}
+	defer m.close()
+	if err := m.command("observe_property", 1, "duration"); err != nil {
+		return 0, err
+	}
+	if err := m.command("loadfile", path, "replace"); err != nil {
+		return 0, err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return 0, errors.New("timed out")
+		case e, ok := <-m.events:
+			if !ok {
+				return 0, errMPVExited
+			}
+			var seconds float64
+			switch {
+			case e.Event == "end-file" && e.Reason == "error":
+				return 0, errors.New("mpv could not open it")
+			case e.Event == "property-change" && e.Name == "duration" && json.Unmarshal(e.Data, &seconds) == nil && seconds > 0:
+				return time.Duration(seconds * float64(time.Second)).Round(time.Millisecond), nil
+			}
+		}
+	}
 }
 
 // readEvents forwards mpv events and closes the channel when mpv goes away.
@@ -163,10 +213,12 @@ func (m *mpv) close() {
 
 var errMPVExited = errors.New("mpv exited")
 
-// show displays one file and returns once it is done: after the image
-// duration, at the end of a video, immediately if mpv can't load it, or as
-// soon as interrupt fires.
-func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, path string, image bool, duration time.Duration) error {
+// show displays one file and returns once it is done: at until, at the end
+// of a video, immediately if mpv can't load it, as soon as interrupt fires,
+// or when moved, checked every second, reports something else should be on
+// screen. A video starts offset into it, so a screen that joins partway
+// through matches the others.
+func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, moved func() bool, path string, image bool, offset time.Duration, until time.Time) error {
 	m.drain()
 	// Loop images so animated GIFs keep moving for their full duration.
 	loop := "no"
@@ -192,6 +244,13 @@ func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, path string, 
 	if err := m.command("set_property", "pause", false); err != nil {
 		return err
 	}
+	start := "none"
+	if offset > 0 {
+		start = fmt.Sprintf("%.3f", offset.Seconds())
+	}
+	if err := m.command("set_property", "start", start); err != nil {
+		return err
+	}
 	// Absolute paths keep mpv from treating a filename as a URL or protocol.
 	if err := m.command("loadfile", path, "replace"); err != nil {
 		return err
@@ -199,17 +258,23 @@ func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, path string, 
 
 	loaded := false
 	loadTimeout := time.After(30 * time.Second)
-	var imageDone <-chan time.Time
+	var done <-chan time.Time
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-interrupt:
 			return nil
+		case <-tick.C:
+			if moved() {
+				return nil
+			}
 		case <-loadTimeout:
 			log.Printf("timed out loading %s", filepath.Base(path))
 			return nil
-		case <-imageDone:
+		case <-done:
 			return nil
 		case e, ok := <-m.events:
 			if !ok {
@@ -218,9 +283,7 @@ func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, path string, 
 			switch {
 			case e.Event == "file-loaded":
 				loaded, loadTimeout = true, nil
-				if image {
-					imageDone = time.After(duration)
-				}
+				done = time.After(time.Until(until))
 			// Before file-loaded, an end-file is the previous file being
 			// replaced, unless the new one failed to open.
 			case e.Event == "end-file" && (loaded || e.Reason == "error"):
@@ -250,24 +313,75 @@ func (m *mpv) drain() {
 }
 
 // play loops through dir forever, with base as the settings display.toml is
-// layered over. While the folder has nothing to play, the image at empty is
-// shown instead. The folder, display.toml, and any `pi-display on|off`
-// override are re-read before every file, so changes show up without
-// restarting anything. A new `pi-display on|off` also cuts the current file
-// short so it takes effect right away.
-// booted means the Pi just powered on, so the TV gets one wake over HDMI-CEC
-// if the screen should be on, even without tv_power, in case it came back up
-// in standby.
-func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool) error {
+// layered over, following the wall-clock timeline in timeline.go so every
+// screen on the folder shows the same file at once. While the folder has
+// nothing to play, the image at empty is shown instead. The folder,
+// display.toml, and any `pi-display on|off` override are re-read before every
+// file, so changes show up without restarting anything. A new
+// `pi-display on|off` cuts the current file short so it takes effect right
+// away, and so does a change to the folder or display.toml that moves what
+// should be on screen: the screen jumps straight to the new spot in the
+// timeline, cutting off whatever was playing.
+// settle is how old a file must be before it plays (see settled), and booted
+// means the Pi just powered on, so the TV gets one wake over HDMI-CEC if the
+// screen should be on, even without tv_power, in case it came back up in
+// standby.
+func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time.Duration, booted bool) error {
 	show := base
-	current := ""
+	var current slot // what's on screen; its name is "" when nothing is
 	showingEmpty := false
-	order := newPlayOrder()
+	videos := newVideoLengths()
 	screenOn := true
 	bootWake := booted
 	var seen override // the last override read, to spot a new on or off command
 	interrupt := watchOverride(ctx, overridePath)
 	go watchScreenFile(ctx, dir)
+	// lineup is what should be on screen at now, given show and the files
+	// in the folder.
+	lineup := func(show Show, names []string, now time.Time) (slot, bool) {
+		length := func(name string) time.Duration {
+			if isImage(name) {
+				return show.imageDuration(name)
+			}
+			return videos.length(ctx, dir, name)
+		}
+		return slotAt(settled(dir, names, settle, now), length, show.Shuffle, now)
+	}
+	// moved re-reads the folder and display.toml while a file plays and
+	// reports whether they now put something else on screen.
+	moved := func() bool {
+		s, err := loadShow(dir, base)
+		if err != nil {
+			s = show
+		}
+		names, _, err := listMedia(dir)
+		if err != nil {
+			return false
+		}
+		want, ok := lineup(s, names, time.Now())
+		return !ok || want.name != current.name || !want.start.Equal(current.start)
+	}
+	// hold keeps what's on screen until t, a new on or off command, or a
+	// change that moves it.
+	hold := func(t time.Time) error {
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		deadline := time.After(time.Until(t))
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-interrupt:
+				return nil
+			case <-deadline:
+				return nil
+			case <-tick.C:
+				if moved() {
+					return nil
+				}
+			}
+		}
+	}
 	var lastProblem, lastSkip string
 	report := func(problem string) {
 		if problem != "" && problem != lastProblem {
@@ -327,6 +441,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 		}
 
 		var names []string
+		var playing slot
 		if screenOn {
 			var unplayable []string
 			var err error
@@ -335,6 +450,10 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 				problem = fmt.Sprintf("read %s: %v", dir, err)
 			} else if len(names) == 0 {
 				problem = fmt.Sprintf("no images or videos in %s yet", dir)
+			}
+			var ok bool
+			if playing, ok = lineup(show, names, time.Now()); !ok {
+				names = nil
 			}
 			skip := ""
 			if len(unplayable) > 0 {
@@ -350,8 +469,8 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 		// With nothing to play the screen shows the empty screen, or goes
 		// black while it is off.
 		if len(names) == 0 {
-			if current != "" || showingEmpty != screenOn {
-				current = ""
+			if current.name != "" || showingEmpty != screenOn {
+				current = slot{}
 				showingEmpty = screenOn
 				var err error
 				if screenOn {
@@ -372,21 +491,25 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, booted bool
 			continue
 		}
 
-		order.shuffle = show.Shuffle
-		next := order.next(names, current)
-		image := isImage(next)
-		if next == current && image {
-			// A lone image: keep it on screen instead of reloading it.
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-interrupt:
-			case <-time.After(show.imageDuration(next)):
+		// The file on screen keeps its turn: an image that comes round again
+		// (a lone image) stays up instead of reloading, and a video that
+		// ended a moment early holds its last frame until the next turn.
+		image := isImage(playing.name)
+		if playing.name == current.name && (image || playing.start.Equal(current.start)) {
+			current = playing
+			if err := hold(playing.end); err != nil {
+				return err
 			}
 			continue
 		}
-		current, showingEmpty = next, false
-		if err := m.show(ctx, interrupt, filepath.Join(dir, next), image, show.imageDuration(next)); err != nil {
+		// Joining a video more than a second in seeks to where the others
+		// are. Any less and the seek would cost more than it saves.
+		var offset time.Duration
+		if late := time.Since(playing.start); !image && late > time.Second {
+			offset = late
+		}
+		current, showingEmpty = playing, false
+		if err := m.show(ctx, interrupt, moved, filepath.Join(dir, playing.name), image, offset, playing.end); err != nil {
 			return err
 		}
 	}

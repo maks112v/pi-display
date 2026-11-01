@@ -28,4 +28,4 @@ Copy files in from another computer with `scp`:
 scp *.jpg pi@raspberrypi.local:~/media/
 ```
 
-Local folders are played in place, not copied, so changes show up at the next slide. The slideshow runs as the user who ran setup, so that user needs to be able to read the folder.
+Local folders are played in place, not copied, so changes show up within a second. The slideshow runs as the user who ran setup, so that user needs to be able to read the folder.
