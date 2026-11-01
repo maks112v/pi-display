@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -103,9 +104,12 @@ func startMPV(ctx context.Context, socket string) (*mpv, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := m.command("observe_property", 1, "eof-reached"); err != nil {
-		m.close()
-		return nil, err
+	// eof-reached ends videos; the rest feed the playback report in show.
+	for i, name := range []string{"eof-reached", "hwdec-current", "frame-drop-count", "decoder-frame-drop-count", "vo-delayed-frame-count"} {
+		if err := m.command("observe_property", i+1, name); err != nil {
+			m.close()
+			return nil, err
+		}
 	}
 	return m, nil
 }
@@ -257,6 +261,10 @@ func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, moved func() 
 	}
 
 	loaded := false
+	var report playback
+	if !image {
+		defer func() { report.log(filepath.Base(path)) }()
+	}
 	loadTimeout := time.After(30 * time.Second)
 	var done <-chan time.Time
 	tick := time.NewTicker(time.Second)
@@ -280,6 +288,10 @@ func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, moved func() 
 			if !ok {
 				return errMPVExited
 			}
+			// mpv resets these for each file, so the last values are this one's.
+			if e.Event == "property-change" {
+				report.update(e)
+			}
 			switch {
 			case e.Event == "file-loaded":
 				loaded, loadTimeout = true, nil
@@ -296,6 +308,37 @@ func (m *mpv) show(ctx context.Context, interrupt <-chan struct{}, moved func() 
 			}
 		}
 	}
+}
+
+// playback is what mpv reported about one video, to spot why playback
+// stutters: frames dropped because the Pi couldn't keep up, and whether
+// hardware decoding is on.
+type playback struct {
+	hwdec                     string // "no" means the CPU is decoding
+	dropped, decoder, delayed int    // dropped by the display, by the decoder, and shown late
+}
+
+func (p *playback) update(e mpvEvent) {
+	switch e.Name {
+	case "hwdec-current":
+		_ = json.Unmarshal(e.Data, &p.hwdec)
+	case "frame-drop-count":
+		_ = json.Unmarshal(e.Data, &p.dropped)
+	case "decoder-frame-drop-count":
+		_ = json.Unmarshal(e.Data, &p.decoder)
+	case "vo-delayed-frame-count":
+		_ = json.Unmarshal(e.Data, &p.delayed)
+	}
+}
+
+// log notes a video that played with trouble or without hardware decoding,
+// and stays quiet for one that played cleanly.
+func (p playback) log(name string) {
+	if p.dropped == 0 && p.decoder == 0 && p.delayed == 0 && p.hwdec != "no" {
+		return
+	}
+	log.Printf("played %s: %d frames dropped, %d dropped by the decoder, %d late, hardware decoding %s",
+		name, p.dropped, p.decoder, p.delayed, cmp.Or(p.hwdec, "unknown"))
 }
 
 // drain discards events left over from the previous file.
@@ -349,7 +392,14 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 	}
 	// moved re-reads the folder and display.toml while a file plays and
 	// reports whether they now put something else on screen.
+	var slowest time.Duration
 	moved := func() bool {
+		defer func(start time.Time) {
+			if took := time.Since(start); took > 250*time.Millisecond && took > slowest {
+				slowest = took
+				log.Printf("checking %s for changes took %s, which can make video stutter", dir, took.Round(time.Millisecond))
+			}
+		}(time.Now())
 		s, err := loadShow(dir, base)
 		if err != nil {
 			s = show
