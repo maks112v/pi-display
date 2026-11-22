@@ -24,10 +24,10 @@ func TestScreenState(t *testing.T) {
 		{"expired override", daytime, override{On: true, Until: now.Add(-time.Hour)}, "off, schedule daily 08:00-18:00"},
 	}
 	for _, tt := range tests {
-		if got := screenState(tt.schedule, tt.override, now); got != tt.want {
+		if got := screenState(tt.schedule, nil, tt.override, now); got != tt.want {
 			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
 		}
-		if got, want := tt.override.screenOn(tt.schedule, now), tt.want[:3] != "off"; got != want {
+		if got, want := tt.override.screenOn(tt.schedule, nil, now), tt.want[:3] != "off"; got != want {
 			t.Errorf("%s: screenOn = %v, want %v", tt.name, got, want)
 		}
 	}

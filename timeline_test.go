@@ -15,7 +15,7 @@ func plays(names []string, length func(string) time.Duration, shuffle bool, from
 	var out []slot
 	at := from
 	for range n {
-		s, _ := slotAt(names, length, shuffle, at)
+		s, _ := slotAt(names, length, shuffle, epoch, at)
 		out = append(out, s)
 		at = s.end
 	}
@@ -29,7 +29,7 @@ func TestSlotAt(t *testing.T) {
 
 	// The loop is 10s long and starts on a multiple of 10s from the epoch.
 	at := time.Unix(1_000_000_003, 0)
-	s, ok := slotAt(names, length, false, at)
+	s, ok := slotAt(names, length, false, epoch, at)
 	if !ok || s.name != "2.jpg" || !s.start.Equal(time.Unix(1_000_000_002, 0)) || !s.end.Equal(time.Unix(1_000_000_007, 0)) {
 		t.Fatalf("slotAt = %+v, %v; want 2.jpg from :02 to :07", s, ok)
 	}
@@ -42,8 +42,14 @@ func TestSlotAt(t *testing.T) {
 		t.Errorf("plays = %v, want %v", got, want)
 	}
 
-	if _, ok := slotAt([]string{"broken.mp4"}, length, false, at); ok {
+	if _, ok := slotAt([]string{"broken.mp4"}, length, false, epoch, at); ok {
 		t.Error("found a slot with nothing playable")
+	}
+
+	// From an event's start, the first file plays first.
+	origin := time.Unix(1_000_000_005, 0)
+	if s, _ := slotAt(names, length, false, origin, origin); s.name != "1.jpg" || !s.start.Equal(origin) {
+		t.Errorf("at origin = %+v, want 1.jpg from origin", s)
 	}
 }
 

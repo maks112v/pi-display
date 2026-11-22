@@ -29,7 +29,7 @@ New files start playing about a minute after they are saved, and deleted files s
 
 ## Limits
 
-- Only files at the top of the folder are used. Subfolders are skipped.
+- Only files at the top of the folder are used. Subfolders are skipped, except an [event](/docs/events) folder.
 - Native Google Docs, Sheets, and Slides are ignored. Export slides as images first.
 - If two files share a name, the first one Drive lists wins.
 - Pi Display reads Drive's public folder page and download links, not an official API. If Google changes those pages, Drive sources can break until Pi Display is updated.

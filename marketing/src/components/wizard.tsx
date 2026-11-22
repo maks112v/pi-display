@@ -280,3 +280,48 @@ export function CopyButton({ text, secondary = false }: { text: string; secondar
     </button>
   );
 }
+
+// A 24-hour HH:MM time picker; empty or invalid shows a red border.
+export function TimeInput({
+  id,
+  label,
+  value,
+  invalid = false,
+  onChange,
+  compact = false,
+}: {
+  id?: string;
+  label?: string;
+  value: string;
+  invalid?: boolean;
+  onChange: (time: string) => void;
+  compact?: boolean;
+}) {
+  return (
+    <input
+      id={id}
+      aria-label={label}
+      type="time"
+      className={`${input} [color-scheme:dark] ${compact ? "h-9 w-auto min-w-0 flex-1" : ""}`}
+      value={value}
+      aria-invalid={invalid || value === ""}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+// A small × button that removes one row of a list.
+export function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className="flex size-8 shrink-0 items-center justify-center rounded text-faint hover:text-fg"
+      onClick={onClick}
+    >
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+        <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    </button>
+  );
+}

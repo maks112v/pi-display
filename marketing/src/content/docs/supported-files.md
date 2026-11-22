@@ -33,7 +33,7 @@ Screens on the same folder play in step. Playback is timed by the Pi's clock, wh
 
 ## What's ignored
 
-- Files inside subfolders. Only the top level of the folder plays.
+- Files inside subfolders. Only the top level of the folder plays, except an [event](/docs/events) folder during its hours.
 - Hidden files, whose names start with a dot.
 
 The folder is checked every second. A change cuts off the current slide and jumps straight to where the new lineup puts every screen. On SMB and Drive, new files wait about a minute first so every screen has them.

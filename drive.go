@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -51,23 +52,24 @@ func connectDrive(ctx context.Context, source string) (fs.FS, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return &driveFS{ctx: ctx, folder: id, ids: map[string]string{}}, func() {}, nil
+	return &driveFS{ctx: ctx, ids: map[string]string{".": id}}, func() {}, nil
 }
 
-// driveFS is the top level of a public Drive folder as an fs.FS. Only files
-// are listed; subfolders and native Google Docs are skipped. Open only finds
-// files seen by the last ReadDir, which is how mirror uses it.
+// driveFS is a public Drive folder as an fs.FS. Files and subfolders are
+// listed; native Google Docs are skipped. ReadDir and Open only find entries
+// seen by an earlier ReadDir of their parent, which is how mirror uses it:
+// the top level first, then an event's subfolder.
 type driveFS struct {
-	ctx    context.Context
-	folder string
-	ids    map[string]string // name -> file ID
+	ctx context.Context
+	ids map[string]string // path ("." for the top) -> file or folder ID
 }
 
 func (d *driveFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	if name != "." {
+	folder, ok := d.ids[name]
+	if !ok {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrNotExist}
 	}
-	resp, err := d.get(http.MethodGet, "https://drive.google.com/embeddedfolderview?id="+d.folder)
+	resp, err := d.get(http.MethodGet, "https://drive.google.com/embeddedfolderview?id="+url.QueryEscape(folder))
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +84,7 @@ func (d *driveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	}
 	entries := make([]fs.DirEntry, len(files))
 	for i, f := range files {
-		d.ids[f.name] = f.id
+		d.ids[path.Join(name, f.name)] = f.id
 		entries[i] = driveEntry{fs: d, file: f}
 	}
 	return entries, nil
@@ -90,7 +92,7 @@ func (d *driveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 func (d *driveFS) Open(name string) (fs.File, error) {
 	id, ok := d.ids[name]
-	if !ok {
+	if !ok || name == "." {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 	}
 	resp, err := d.download(http.MethodGet, id)
@@ -132,12 +134,16 @@ func (d *driveFS) get(method, target string) (*http.Response, error) {
 	return resp, nil
 }
 
-type driveListing struct{ id, name string }
+type driveListing struct {
+	id, name string
+	dir      bool
+}
 
 var driveEntryPattern = regexp.MustCompile(`(?s)class="flip-entry" id="entry-([\w-]+)".*?href="([^"]*)".*?class="flip-entry-title">([^<]*)<`)
 
-// parseDriveListing extracts the files from an embeddedfolderview page. Drive
-// allows duplicate names in one folder; the first one listed wins.
+// parseDriveListing extracts the files and subfolders from an
+// embeddedfolderview page. Drive allows duplicate names in one folder; the
+// first one listed wins.
 func parseDriveListing(page string) ([]driveListing, error) {
 	// A private folder redirects to a sign-in page, which has no listing.
 	if !strings.Contains(page, `id="flip-contents"`) {
@@ -147,11 +153,12 @@ func parseDriveListing(page string) ([]driveListing, error) {
 	seen := map[string]bool{}
 	for _, m := range driveEntryPattern.FindAllStringSubmatch(page, -1) {
 		name := html.UnescapeString(m[3])
-		if !strings.Contains(m[2], "drive.google.com/file/d/") || seen[name] {
+		dir := strings.Contains(m[2], "drive.google.com/drive/folders/")
+		if !dir && !strings.Contains(m[2], "drive.google.com/file/d/") || seen[name] {
 			continue
 		}
 		seen[name] = true
-		files = append(files, driveListing{id: m[1], name: name})
+		files = append(files, driveListing{id: m[1], name: name, dir: dir})
 	}
 	return files, nil
 }
@@ -163,11 +170,20 @@ type driveEntry struct {
 	file driveListing
 }
 
-func (e driveEntry) Name() string      { return e.file.name }
-func (e driveEntry) IsDir() bool       { return false }
-func (e driveEntry) Type() fs.FileMode { return 0 }
+func (e driveEntry) Name() string { return e.file.name }
+func (e driveEntry) IsDir() bool  { return e.file.dir }
+
+func (e driveEntry) Type() fs.FileMode {
+	if e.file.dir {
+		return fs.ModeDir
+	}
+	return 0
+}
 
 func (e driveEntry) Info() (fs.FileInfo, error) {
+	if e.file.dir {
+		return fileInfo{name: e.file.name, dir: true}, nil
+	}
 	resp, err := e.fs.download(http.MethodHead, e.file.id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", e.file.name, err)
@@ -193,11 +209,19 @@ type fileInfo struct {
 	name    string
 	size    int64
 	modTime time.Time
+	dir     bool
 }
 
-func (i fileInfo) Name() string       { return i.name }
-func (i fileInfo) Size() int64        { return i.size }
-func (i fileInfo) Mode() fs.FileMode  { return 0o444 }
+func (i fileInfo) Name() string { return i.name }
+func (i fileInfo) Size() int64  { return i.size }
+
+func (i fileInfo) Mode() fs.FileMode {
+	if i.dir {
+		return fs.ModeDir | 0o555
+	}
+	return 0o444
+}
+
 func (i fileInfo) ModTime() time.Time { return i.modTime }
-func (i fileInfo) IsDir() bool        { return false }
+func (i fileInfo) IsDir() bool        { return i.dir }
 func (i fileInfo) Sys() any           { return nil }

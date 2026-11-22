@@ -20,10 +20,17 @@ type override struct {
 func (o override) active(now time.Time) bool { return now.Before(o.Until) }
 
 // screenOn reports whether the screen should be on at now: the override while
-// it lasts, otherwise the schedule.
-func (o override) screenOn(s *Schedule, now time.Time) bool {
+// it lasts, then any event (on during its hours, off for the rest of its
+// dates), otherwise the schedule.
+func (o override) screenOn(s *Schedule, es events, now time.Time) bool {
 	if o.active(now) {
 		return o.On
+	}
+	if _, _, ok := es.active(now); ok {
+		return true
+	}
+	if es.dayOff(now) {
+		return false
 	}
 	return s.awake(now)
 }

@@ -39,7 +39,10 @@ func TestParseDriveListing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []driveListing{{id: "13AhW1Z1GYGaiTpJ0Pr2TTXoQivb6jx-a", name: "Tom & Jerry.jpg"}}
+	want := []driveListing{
+		{id: "1oow464Z4Et95RAwtRZn6dLOFb_YYpLwL", name: "sub", dir: true},
+		{id: "13AhW1Z1GYGaiTpJ0Pr2TTXoQivb6jx-a", name: "Tom & Jerry.jpg"},
+	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
