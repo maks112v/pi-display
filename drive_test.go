@@ -1,7 +1,13 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"io"
+	"io/fs"
+	"net/http"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -48,5 +54,45 @@ func TestParseDriveListing(t *testing.T) {
 	}
 	if _, err := parseDriveListing(`<html><title>Sign in</title></html>`); err == nil {
 		t.Error("sign-in page: expected error")
+	}
+}
+
+type roundTrip func(*http.Request) (*http.Response, error)
+
+func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestDriveFSSkipsUnsafeNames(t *testing.T) {
+	entry := func(id, name string) string {
+		return `<div class="flip-entry" id="entry-` + id + `"><a href="https://drive.google.com/file/d/` + id + `/view"><div class="flip-entry-title">` + name + `</div></a></div>`
+	}
+	page := `<div id="flip-contents">` + entry("good", "01.jpg") + entry("evil", "x/../01.jpg") + `</div>`
+	saved := driveClient
+	defer func() { driveClient = saved }()
+	var downloads []string
+	driveClient = &http.Client{Transport: roundTrip(func(r *http.Request) (*http.Response, error) {
+		if strings.Contains(r.URL.Path, "download") {
+			downloads = append(downloads, r.URL.Query().Get("id"))
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(page))}, nil
+	})}
+
+	d := &driveFS{ctx: context.Background(), entries: map[string]driveListing{".": {id: "root", dir: true}, "sub": {id: "sub", dir: true}}}
+	entries, err := d.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "01.jpg" {
+		t.Errorf("entries = %v, want only 01.jpg", entries)
+	}
+	f, err := d.Open("01.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	if _, err := d.Open("sub"); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("Open(sub) = %v, want not exist", err)
+	}
+	if !slices.Equal(downloads, []string{"good"}) {
+		t.Errorf("downloads = %v, want only good", downloads)
 	}
 }

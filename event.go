@@ -26,14 +26,16 @@ import (
 // main folder, starting on its first file at the window's start. On those
 // dates its hours replace the schedule, so outside them the screen is off.
 // Once its last window is over the file does nothing, so it never runs again.
-// Slideshow keys (image_seconds, mute, fit, shuffle, tv_power, [durations])
-// may be set too; they apply to the event only, over display.toml.
+// Slideshow keys (image_seconds, mute, fit, shuffle, [durations]) may be set
+// too; they apply to the event only, over display.toml. tv_power stays
+// display.toml's, so the player that put the TV in standby also wakes it.
 
 const (
 	eventSuffix  = ".event.toml"
 	maxEventSize = 64 << 10
 	maxEvents    = 64
 	maxDates     = 366
+	maxHours     = 24
 )
 
 type Event struct {
@@ -75,6 +77,9 @@ func parseEvent(name string, data []byte, base Show, loc *time.Location) (Event,
 	if f.Schedule != nil {
 		return Event{}, errors.New("an event takes dates and hours, not a schedule")
 	}
+	if md.IsDefined("tv_power") {
+		return Event{}, errors.New("tv_power is set in display.toml, not in an event")
+	}
 	if !safeName(f.Folder) {
 		return Event{}, fmt.Errorf(`folder must be the name of a subfolder, like "gala", got %q`, f.Folder)
 	}
@@ -83,6 +88,9 @@ func parseEvent(name string, data []byte, base Show, loc *time.Location) (Event,
 	}
 	if err := f.Show.validate(); err != nil {
 		return Event{}, err
+	}
+	if len(f.Hours) > maxHours {
+		return Event{}, fmt.Errorf("hours takes at most %d windows", maxHours)
 	}
 	windows := make([]window, len(f.Hours))
 	for i, text := range f.Hours {
@@ -99,8 +107,14 @@ func parseEvent(name string, data []byte, base Show, loc *time.Location) (Event,
 		}
 		// time.Date rather than adding minutes, so clock changes don't
 		// shift the hours.
+		// A time the clocks skip going forward, like 02:30, comes back
+		// from time.Date an hour early; it's moved an hour later instead.
 		at := func(days int, c clock) time.Time {
-			return time.Date(d.Year(), d.Month(), d.Day()+days, int(c/60), int(c%60), 0, 0, loc)
+			t := time.Date(d.Year(), d.Month(), d.Day()+days, int(c/60), int(c%60), 0, 0, loc)
+			if t.Hour() != int(c/60) || t.Minute() != int(c%60) {
+				t = t.Add(time.Hour)
+			}
+			return t
 		}
 		day := span{at(0, 0), at(1, 0)}
 		e.days = append(e.days, day)
@@ -112,7 +126,10 @@ func parseEvent(name string, data []byte, base Show, loc *time.Location) (Event,
 			if w.Off < w.On {
 				end = at(1, w.Off)
 			}
-			e.windows = append(e.windows, span{at(0, w.On), end})
+			// Moving a skipped time can leave nothing of a short window.
+			if start := at(0, w.On); end.After(start) {
+				e.windows = append(e.windows, span{start, end})
+			}
 		}
 	}
 	slices.SortFunc(e.windows, func(a, b span) int { return a.start.Compare(b.start) })
@@ -130,10 +147,12 @@ func isEventFile(name string) bool {
 
 // ended reports whether every window is over at now.
 func (e Event) ended(now time.Time) bool {
-	return len(e.windows) == 0 || !now.Before(e.windows[len(e.windows)-1].end)
+	_, ok := e.next(now)
+	return !ok
 }
 
-// next is the first window that hasn't ended at now.
+// next is the first window, by start, that hasn't ended at now. Windows are
+// sorted by start, not end, so an overnight window can end after a later one.
 func (e Event) next(now time.Time) (span, bool) {
 	for _, w := range e.windows {
 		if now.Before(w.end) {

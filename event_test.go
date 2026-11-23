@@ -90,6 +90,8 @@ func TestParseEventRejects(t *testing.T) {
 		`folder = "gala"` + "\n" + `dates = ["2026-12-05"]` + "\n" + `colour = "red"`,
 		`folder = "gala"` + "\n" + `dates = ["2026-12-05"]` + "\n" + `fit = "stretch"`,
 		`folder = "gala"` + "\n" + `dates = ["2026-12-05"]` + "\n" + "[schedule]\non = \"07:00\"\noff = \"09:00\"",
+		`folder = "gala"` + "\n" + `dates = ["2026-12-05"]` + "\n" + `tv_power = false`,
+		`folder = "gala"` + "\n" + `dates = ["2026-12-05"]` + "\n" + `hours = [` + strings.Repeat(`"10:00-11:00", `, maxHours) + `"12:00-13:00"]`,
 	} {
 		if _, err := parseEvent("x.event.toml", []byte(text), defaultShow, time.UTC); err == nil {
 			t.Errorf("parseEvent(%q): expected error", text)
@@ -167,6 +169,34 @@ hours = ["17:00-18:00"]`), defaultShow, loc)
 	}
 	if got := e.days[0].end.Sub(e.days[0].start); got != 25*time.Hour {
 		t.Errorf("day is %v long, want 25h", got)
+	}
+
+	// Clocks go forward from 02:00 to 03:00 on 2026-03-08, so 02:30 is
+	// 03:30 and 02:30-03:10 is nothing.
+	e, err = parseEvent("x.event.toml", []byte(`folder = "x"
+dates = ["2026-03-08"]
+hours = ["02:30-03:10", "01:30-02:30", "17:00-18:00"]`), defaultShow, loc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []span{
+		{time.Date(2026, 3, 8, 1, 30, 0, 0, loc), time.Date(2026, 3, 8, 3, 30, 0, 0, loc)},
+		{time.Date(2026, 3, 8, 17, 0, 0, 0, loc), time.Date(2026, 3, 8, 18, 0, 0, 0, loc)},
+	}
+	if !slices.Equal(e.windows, want) {
+		t.Errorf("windows = %v, want %v", e.windows, want)
+	}
+}
+
+func TestEventEndedWithOvernightWindow(t *testing.T) {
+	e := mustEvent(t, "a.event.toml", `folder = "a"
+dates = ["2026-12-05"]
+hours = ["17:00-01:00", "20:00-22:00"]`)
+	if e.ended(at(5, 22, 30)) {
+		t.Error("ended at 22:30, but 17:00-01:00 is still on")
+	}
+	if !e.ended(at(6, 1, 0)) {
+		t.Error("not ended at 01:00")
 	}
 }
 

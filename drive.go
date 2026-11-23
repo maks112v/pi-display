@@ -52,7 +52,7 @@ func connectDrive(ctx context.Context, source string) (fs.FS, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return &driveFS{ctx: ctx, ids: map[string]string{".": id}}, func() {}, nil
+	return &driveFS{ctx: ctx, entries: map[string]driveListing{".": {id: id, dir: true}}}, func() {}, nil
 }
 
 // driveFS is a public Drive folder as an fs.FS. Files and subfolders are
@@ -60,16 +60,16 @@ func connectDrive(ctx context.Context, source string) (fs.FS, func(), error) {
 // seen by an earlier ReadDir of their parent, which is how mirror uses it:
 // the top level first, then an event's subfolder.
 type driveFS struct {
-	ctx context.Context
-	ids map[string]string // path ("." for the top) -> file or folder ID
+	ctx     context.Context
+	entries map[string]driveListing // by path, "." for the top
 }
 
 func (d *driveFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	folder, ok := d.ids[name]
-	if !ok {
+	folder, ok := d.entries[name]
+	if !ok || !folder.dir {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrNotExist}
 	}
-	resp, err := d.get(http.MethodGet, "https://drive.google.com/embeddedfolderview?id="+url.QueryEscape(folder))
+	resp, err := d.get(http.MethodGet, "https://drive.google.com/embeddedfolderview?id="+url.QueryEscape(folder.id))
 	if err != nil {
 		return nil, err
 	}
@@ -82,20 +82,27 @@ func (d *driveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	entries := make([]fs.DirEntry, len(files))
-	for i, f := range files {
-		d.ids[path.Join(name, f.name)] = f.id
-		entries[i] = driveEntry{fs: d, file: f}
+	var entries []fs.DirEntry
+	for _, f := range files {
+		// path.Join would clean a name like "x/../01.jpg" into another
+		// entry's path, so only plain names are indexed.
+		if !safeName(f.name) {
+			continue
+		}
+		d.entries[path.Join(name, f.name)] = f
+		entries = append(entries, driveEntry{fs: d, file: f})
 	}
 	return entries, nil
 }
 
 func (d *driveFS) Open(name string) (fs.File, error) {
-	id, ok := d.ids[name]
-	if !ok || name == "." {
+	// Folders can't be opened, only listed, so a stat of one fails without
+	// a request and mirror falls back to the sync tick.
+	f, ok := d.entries[name]
+	if !ok || f.dir {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
 	}
-	resp, err := d.download(http.MethodGet, id)
+	resp, err := d.download(http.MethodGet, f.id)
 	if err != nil {
 		return nil, err
 	}

@@ -426,6 +426,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 	var seen override // the last override read, to spot a new on or off command
 	interrupt := watchOverride(ctx, overridePath)
 	go watchScreenFile(ctx, dir)
+	go videos.measureEvents(ctx, dir)
 	// lineup is what should be on screen at now, given c and the files in
 	// its folder.
 	lineup := func(c choice, names []string, now time.Time) (slot, bool) {
@@ -437,6 +438,22 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		}
 		return slotAt(settled(c.dir, names, settle, now), length, c.show.Shuffle, c.origin, now)
 	}
+	// pick is choose, falling back to the main folder while the event's
+	// folder has nothing ready to play, like files still settling or only
+	// videos whose length can't be read.
+	pick := func(s Show, o override, now time.Time) (choice, []string) {
+		c, problems := choose(dir, s, o, now)
+		if c.event != "" && !c.waiting {
+			names, _, err := listMedia(c.dir)
+			if _, ok := lineup(c, names, now); err != nil || !ok {
+				c.dir, c.show, c.origin, c.waiting = dir, s, epoch, true
+			}
+		}
+		return c, problems
+	}
+	// The mute and fit last sent to mpv.
+	var mute bool
+	var fit string
 	// moved re-reads the folder, display.toml, and events while a file plays
 	// and reports whether they now put something else on screen.
 	var slowest time.Duration
@@ -452,8 +469,8 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 			s = show
 		}
 		now := time.Now()
-		c, _ := choose(dir, s, readOverride(overridePath), now)
-		if c.on != screenOn || c.dir != currentDir {
+		c, _ := pick(s, readOverride(overridePath), now)
+		if c.on != screenOn || c.dir != currentDir || c.show.Mute != mute || c.show.Fit != fit {
 			return true
 		}
 		names, _, err := listMedia(c.dir)
@@ -502,7 +519,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		}
 		now := time.Now()
 		o := readOverride(overridePath)
-		c, eventProblems := choose(dir, show, o, now)
+		c, eventProblems := pick(show, o, now)
 		if !slices.Equal(eventProblems, lastEventProblems) {
 			for _, p := range eventProblems {
 				log.Print(p)
@@ -528,6 +545,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		if err := m.command("set_property", "panscan", panscan); err != nil {
 			return err
 		}
+		mute, fit = c.show.Mute, c.show.Fit
 
 		// Outside the schedule the screen goes black, and `pi-display on|off`
 		// overrides the schedule for a while. Events turn it on for their
@@ -554,7 +572,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 			default:
 				log.Print("screen off until the schedule or an event turns it back on")
 			}
-			if c.show.TVPower || wake {
+			if show.TVPower || wake {
 				if err := setTVPower(ctx, on); err != nil {
 					log.Printf("couldn't switch the TV over HDMI-CEC: %v", err)
 				}

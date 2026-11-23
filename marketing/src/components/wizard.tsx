@@ -171,12 +171,15 @@ export function SecondsInput({
   value,
   onChange,
   compact = false,
+  optional = false,
 }: {
   id?: string;
   label?: string;
   value: number;
   onChange: (seconds: number) => void;
   compact?: boolean;
+  // Blank (NaN) is allowed and isn't marked invalid.
+  optional?: boolean;
 }) {
   return (
     <input
@@ -188,7 +191,7 @@ export function SecondsInput({
       max={maxSeconds}
       className={compact ? `${input} h-9 text-right` : input}
       value={Number.isNaN(value) ? "" : value}
-      aria-invalid={!isValidSeconds(value)}
+      aria-invalid={!(optional && Number.isNaN(value)) && !isValidSeconds(value)}
       onChange={(e) => onChange(e.target.valueAsNumber)}
     />
   );

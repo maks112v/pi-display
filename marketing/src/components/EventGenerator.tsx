@@ -51,7 +51,8 @@ export default function EventGenerator() {
               placeholder="gala"
               value={s.folder}
               aria-invalid={folderInvalid}
-              onChange={(e) => set({ folder: e.target.value.trim() })}
+              onChange={(e) => set({ folder: e.target.value })}
+              onBlur={() => set({ folder: s.folder.trim() })}
               spellCheck={false}
               autoComplete="off"
             />
@@ -146,7 +147,7 @@ export default function EventGenerator() {
           <div className="mt-6 flex flex-col gap-6">
             <Field label="Seconds per image" hint="Leave blank to keep display.toml's.">
               {(id) => (
-                <SecondsInput id={id} value={s.imageSeconds} onChange={(imageSeconds) => set({ imageSeconds })} />
+                <SecondsInput id={id} value={s.imageSeconds} onChange={(imageSeconds) => set({ imageSeconds })} optional />
               )}
             </Field>
             <Choice

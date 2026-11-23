@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 )
 
@@ -131,6 +132,7 @@ func settled(dir string, names []string, settle time.Duration, now time.Time) []
 // than probed again before every file.
 type videoLengths struct {
 	probe func(ctx context.Context, path string) (time.Duration, error)
+	mu    sync.Mutex
 	known map[string]time.Duration
 }
 
@@ -147,16 +149,47 @@ func (v *videoLengths) length(ctx context.Context, dir, name string) time.Durati
 	// Keyed by path, since an event folder can hold a file with the same
 	// name as one in the main folder.
 	key := fmt.Sprintf("%s\x00%d\x00%d", path, info.Size(), info.ModTime().UnixNano())
-	if d, ok := v.known[key]; ok {
+	v.mu.Lock()
+	d, ok := v.known[key]
+	v.mu.Unlock()
+	if ok {
 		return d
 	}
-	d, err := v.probe(ctx, path)
+	// Probed unlocked, so measureEvents doesn't hold up playback. At worst
+	// both measure the same file once.
+	d, err = v.probe(ctx, path)
 	if err != nil {
 		if ctx.Err() != nil {
 			return 0 // shutting down; measure it next time
 		}
 		log.Printf("skipping %s: couldn't read its length: %v", name, err)
 	}
+	v.mu.Lock()
 	v.known[key] = d
+	v.mu.Unlock()
 	return d
+}
+
+// measureEvents measures the videos in the folders of events that haven't
+// ended, every minute, so an event starts on time instead of waiting on
+// probes of its whole folder.
+func (v *videoLengths) measureEvents(ctx context.Context, dir string) {
+	tick := time.NewTicker(time.Minute)
+	defer tick.Stop()
+	for {
+		es, _ := loadEvents(dir, defaultShow, time.Local)
+		for _, folder := range es.liveFolders(time.Now()) {
+			names, _, _ := listMedia(filepath.Join(dir, folder))
+			for _, name := range names {
+				if !isImage(name) && ctx.Err() == nil {
+					v.length(ctx, filepath.Join(dir, folder), name)
+				}
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
 }
