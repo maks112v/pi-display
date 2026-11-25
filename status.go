@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -83,16 +84,55 @@ func status() {
 	if err != nil {
 		row("show", "%s ignored: %v", showFile, err)
 	}
-	row("screen", "%s", screenState(show.Schedule, readOverride(overridePath), time.Now()))
+	now := time.Now()
+	es, problems := loadEvents(dir, show, time.Local)
+	row("screen", "%s", screenState(show.Schedule, es, readOverride(overridePath), now))
+	for _, line := range eventLines(dir, es, now) {
+		row("event", "%s", line)
+	}
+	for _, problem := range problems {
+		row("event", "%s", problem)
+	}
+}
+
+// eventLines describes each event for status: playing, coming up, or over.
+func eventLines(dir string, es events, now time.Time) []string {
+	var lines []string
+	for _, e := range es {
+		w, ok := e.next(now)
+		line := e.File + ": "
+		switch {
+		case !ok:
+			line += "ended, safe to delete"
+		case w.contains(now):
+			line += fmt.Sprintf("%s/ until %s", e.Folder, w.end.Format("Mon Jan 2 15:04"))
+		default:
+			line += fmt.Sprintf("%s/ from %s to %s", e.Folder, w.start.Format("Mon Jan 2 15:04"), w.end.Format("Mon Jan 2 15:04"))
+		}
+		if ok {
+			if names, _, err := listMedia(filepath.Join(dir, e.Folder)); err != nil || len(names) == 0 {
+				line += ", but the folder has nothing to play yet"
+			} else {
+				line += fmt.Sprintf(", %d files", len(names))
+			}
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 // screenState describes whether the screen should be on at now and why.
-func screenState(s *Schedule, o override, now time.Time) string {
+func screenState(s *Schedule, es events, o override, now time.Time) string {
+	e, w, inEvent := es.active(now)
 	switch {
 	case o.active(now) && o.On:
 		return "on until " + o.Until.Format("Mon 15:04") + " (pi-display on)"
 	case o.active(now):
 		return "off until " + o.Until.Format("Mon 15:04") + " (pi-display off)"
+	case inEvent:
+		return "on until " + w.end.Format("Mon 15:04") + " (event " + e.File + ")"
+	case es.dayOff(now):
+		return "off, an event replaces today's schedule"
 	case s == nil:
 		return "on, no schedule"
 	case s.awake(now):

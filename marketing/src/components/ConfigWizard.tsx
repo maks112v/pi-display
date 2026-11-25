@@ -17,12 +17,13 @@ import {
   CopyButton,
   Field,
   Output,
+  RemoveButton,
   SecondsInput,
   Segmented,
   Switch,
+  TimeInput,
   Wizard,
   download,
-  input,
   primaryButton,
   smallButton,
   useWizard,
@@ -332,47 +333,4 @@ function ScheduleEditor({ value, onChange }: { value: Schedule; onChange: (sched
 function nextWindow(last: Window | undefined): Window {
   if (!last) return { on: "09:00", off: "18:00" };
   return { on: last.off, off: last.off < "22:00" ? "22:00" : "23:59" };
-}
-
-function TimeInput({
-  id,
-  label,
-  value,
-  invalid = false,
-  onChange,
-  compact = false,
-}: {
-  id?: string;
-  label?: string;
-  value: string;
-  invalid?: boolean;
-  onChange: (time: string) => void;
-  compact?: boolean;
-}) {
-  return (
-    <input
-      id={id}
-      aria-label={label}
-      type="time"
-      className={`${input} [color-scheme:dark] ${compact ? "h-9 w-auto min-w-0 flex-1" : ""}`}
-      value={value}
-      aria-invalid={invalid || value === ""}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
-}
-
-function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className="flex size-8 shrink-0 items-center justify-center rounded text-faint hover:text-fg"
-      onClick={onClick}
-    >
-      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-        <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" strokeWidth="1.5" />
-      </svg>
-    </button>
-  );
 }

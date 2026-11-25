@@ -33,7 +33,7 @@ The duration counts from when the file was saved, not from when each Pi notices 
 
 Each saved version of the file runs once. To send a new command, save the file again, even if the words are the same. Deleting the file doesn't cancel anything; save `on 0` instead.
 
-Between `screen.txt` and someone running `pi-display on` or `off` on a Pi, whichever is newer wins.
+`screen.txt` also wins over an [event](/docs/events), but only switches the screen on or off. Between `screen.txt` and someone running `pi-display on` or `off` on a Pi, whichever is newer wins.
 
 ## Checking it worked
 

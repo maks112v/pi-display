@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -355,15 +356,60 @@ func (m *mpv) drain() {
 	}
 }
 
+// choice is what should be on screen at a moment: whether the screen is on,
+// and which folder plays with which settings.
+type choice struct {
+	on     bool
+	dir    string
+	show   Show
+	origin time.Time // where the folder's timeline starts
+	// event is the active event's file, "" when none. waiting means its
+	// folder has nothing to play yet, so the main folder plays instead.
+	event, folder string
+	until         time.Time
+	waiting       bool
+}
+
+// choose works out what should be on screen at now in dir, given the main
+// folder's settings and the current override: an active event's folder once
+// it has something to play, otherwise the main folder.
+func choose(dir string, show Show, o override, now time.Time) (choice, []string) {
+	es, problems := loadEvents(dir, show, time.Local)
+	c := choice{on: o.screenOn(show.Schedule, es, now), dir: dir, show: show, origin: epoch}
+	if e, w, ok := es.active(now); ok {
+		c.event, c.folder, c.until = e.File, e.Folder, w.end
+		eventDir := filepath.Join(dir, e.Folder)
+		if names, _, err := listMedia(eventDir); err == nil && len(names) > 0 {
+			c.dir, c.show, c.origin = eventDir, e.Show, w.start
+		} else {
+			c.waiting = true
+		}
+	}
+	return c, problems
+}
+
+// note is the log line for c's event, "" when there is none.
+func (c choice) note() string {
+	switch {
+	case c.event == "":
+		return ""
+	case c.waiting:
+		return fmt.Sprintf("event %s: %s/ has nothing to play yet, playing the main folder until it does", c.event, c.folder)
+	default:
+		return fmt.Sprintf("event %s: playing %s/ until %s", c.event, c.folder, c.until.Format("Mon 15:04"))
+	}
+}
+
 // play loops through dir forever, with base as the settings display.toml is
 // layered over, following the wall-clock timeline in timeline.go so every
 // screen on the folder shows the same file at once. While the folder has
 // nothing to play, the image at empty is shown instead. The folder,
-// display.toml, and any `pi-display on|off` override are re-read before every
-// file, so changes show up without restarting anything. A new
-// `pi-display on|off` cuts the current file short so it takes effect right
-// away, and so does a change to the folder or display.toml that moves what
-// should be on screen: the screen jumps straight to the new spot in the
+// display.toml, event files, and any `pi-display on|off` override are
+// re-read before every file and every second while one plays, so changes
+// show up without restarting anything. A new `pi-display on|off`, a change
+// to the folder or display.toml that moves what should be on screen, an
+// event starting or ending, or the schedule switching the screen cuts the
+// current file short: the screen jumps straight to the new spot in the
 // timeline, cutting off whatever was playing.
 // settle is how old a file must be before it plays (see settled), and booted
 // means the Pi just powered on, so the TV gets one wake over HDMI-CEC if the
@@ -372,6 +418,7 @@ func (m *mpv) drain() {
 func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time.Duration, booted bool) error {
 	show := base
 	var current slot // what's on screen; its name is "" when nothing is
+	currentDir := ""
 	showingEmpty := false
 	videos := newVideoLengths()
 	screenOn := true
@@ -379,19 +426,36 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 	var seen override // the last override read, to spot a new on or off command
 	interrupt := watchOverride(ctx, overridePath)
 	go watchScreenFile(ctx, dir)
-	// lineup is what should be on screen at now, given show and the files
-	// in the folder.
-	lineup := func(show Show, names []string, now time.Time) (slot, bool) {
+	go videos.measureEvents(ctx, dir)
+	// lineup is what should be on screen at now, given c and the files in
+	// its folder.
+	lineup := func(c choice, names []string, now time.Time) (slot, bool) {
 		length := func(name string) time.Duration {
 			if isImage(name) {
-				return show.imageDuration(name)
+				return c.show.imageDuration(name)
 			}
-			return videos.length(ctx, dir, name)
+			return videos.length(ctx, c.dir, name)
 		}
-		return slotAt(settled(dir, names, settle, now), length, show.Shuffle, now)
+		return slotAt(settled(c.dir, names, settle, now), length, c.show.Shuffle, c.origin, now)
 	}
-	// moved re-reads the folder and display.toml while a file plays and
-	// reports whether they now put something else on screen.
+	// pick is choose, falling back to the main folder while the event's
+	// folder has nothing ready to play, like files still settling or only
+	// videos whose length can't be read.
+	pick := func(s Show, o override, now time.Time) (choice, []string) {
+		c, problems := choose(dir, s, o, now)
+		if c.event != "" && !c.waiting {
+			names, _, err := listMedia(c.dir)
+			if _, ok := lineup(c, names, now); err != nil || !ok {
+				c.dir, c.show, c.origin, c.waiting = dir, s, epoch, true
+			}
+		}
+		return c, problems
+	}
+	// The mute and fit last sent to mpv.
+	var mute bool
+	var fit string
+	// moved re-reads the folder, display.toml, and events while a file plays
+	// and reports whether they now put something else on screen.
 	var slowest time.Duration
 	moved := func() bool {
 		defer func(start time.Time) {
@@ -404,11 +468,16 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		if err != nil {
 			s = show
 		}
-		names, _, err := listMedia(dir)
+		now := time.Now()
+		c, _ := pick(s, readOverride(overridePath), now)
+		if c.on != screenOn || c.dir != currentDir || c.show.Mute != mute || c.show.Fit != fit {
+			return true
+		}
+		names, _, err := listMedia(c.dir)
 		if err != nil {
 			return false
 		}
-		want, ok := lineup(s, names, time.Now())
+		want, ok := lineup(c, names, now)
 		return !ok || want.name != current.name || !want.start.Equal(current.start)
 	}
 	// hold keeps what's on screen until t, a new on or off command, or a
@@ -432,7 +501,8 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 			}
 		}
 	}
-	var lastProblem, lastSkip string
+	var lastProblem, lastSkip, lastNote string
+	var lastEventProblems []string
 	report := func(problem string) {
 		if problem != "" && problem != lastProblem {
 			log.Print(problem)
@@ -447,29 +517,46 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		} else {
 			show = s
 		}
+		now := time.Now()
+		o := readOverride(overridePath)
+		c, eventProblems := pick(show, o, now)
+		if !slices.Equal(eventProblems, lastEventProblems) {
+			for _, p := range eventProblems {
+				log.Print(p)
+			}
+			lastEventProblems = eventProblems
+		}
+		if note := c.note(); note != lastNote {
+			if note == "" {
+				log.Print("event over, back to the main folder")
+			} else {
+				log.Print(note)
+			}
+			lastNote = note
+		}
+
 		panscan := 0.0
-		if show.Fit == "cover" {
+		if c.show.Fit == "cover" {
 			panscan = 1.0
 		}
-		if err := m.command("set_property", "mute", show.Mute); err != nil {
+		if err := m.command("set_property", "mute", c.show.Mute); err != nil {
 			return err
 		}
 		if err := m.command("set_property", "panscan", panscan); err != nil {
 			return err
 		}
+		mute, fit = c.show.Mute, c.show.Fit
 
 		// Outside the schedule the screen goes black, and `pi-display on|off`
-		// overrides the schedule for a while. With tv_power the TV is also put
-		// in standby over HDMI-CEC, and woken when the screen comes back on.
-		// A new on or off command switches the TV even if the screen was
-		// already in that state, so `on` wakes a TV someone turned off with
-		// the remote. Schedule changes and expired overrides land at the next
-		// file boundary.
-		now := time.Now()
-		o := readOverride(overridePath)
+		// overrides the schedule for a while. Events turn it on for their
+		// hours and off for the rest of their dates. With tv_power the TV is
+		// also put in standby over HDMI-CEC, and woken when the screen comes
+		// back on. A new on or off command switches the TV even if the screen
+		// was already in that state, so `on` wakes a TV someone turned off
+		// with the remote.
 		fresh := o != seen && o.active(now)
 		seen = o
-		if on := o.screenOn(show.Schedule, now); on != screenOn || fresh || bootWake {
+		if on := c.on; on != screenOn || fresh || bootWake {
 			wake := bootWake && on
 			bootWake = false
 			screenOn = on
@@ -478,10 +565,12 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 				log.Printf("screen on until %s (pi-display on)", until)
 			case o.active(now):
 				log.Printf("screen off until %s (pi-display off)", until)
+			case on && c.event != "":
+				log.Printf("screen on until %s (event %s)", c.until.Format("Mon 15:04"), c.event)
 			case on:
 				log.Print("screen on")
 			default:
-				log.Print("screen off until the schedule turns it back on")
+				log.Print("screen off until the schedule or an event turns it back on")
 			}
 			if show.TVPower || wake {
 				if err := setTVPower(ctx, on); err != nil {
@@ -495,14 +584,14 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		if screenOn {
 			var unplayable []string
 			var err error
-			names, unplayable, err = listMedia(dir)
+			names, unplayable, err = listMedia(c.dir)
 			if err != nil {
-				problem = fmt.Sprintf("read %s: %v", dir, err)
+				problem = fmt.Sprintf("read %s: %v", c.dir, err)
 			} else if len(names) == 0 {
-				problem = fmt.Sprintf("no images or videos in %s yet", dir)
+				problem = fmt.Sprintf("no images or videos in %s yet", c.dir)
 			}
 			var ok bool
-			if playing, ok = lineup(show, names, time.Now()); !ok {
+			if playing, ok = lineup(c, names, time.Now()); !ok {
 				names = nil
 			}
 			skip := ""
@@ -517,10 +606,11 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		report(problem)
 
 		// With nothing to play the screen shows the empty screen, or goes
-		// black while it is off.
+		// black while it is off. Checked every second, so an event or the
+		// schedule turning the screen on lands on time.
 		if len(names) == 0 {
 			if current.name != "" || showingEmpty != screenOn {
-				current = slot{}
+				current, currentDir = slot{}, ""
 				showingEmpty = screenOn
 				var err error
 				if screenOn {
@@ -536,7 +626,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 			case <-ctx.Done():
 				return ctx.Err()
 			case <-interrupt:
-			case <-time.After(5 * time.Second):
+			case <-time.After(time.Second):
 			}
 			continue
 		}
@@ -545,7 +635,7 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		// (a lone image) stays up instead of reloading, and a video that
 		// ended a moment early holds its last frame until the next turn.
 		image := isImage(playing.name)
-		if playing.name == current.name && (image || playing.start.Equal(current.start)) {
+		if c.dir == currentDir && playing.name == current.name && (image || playing.start.Equal(current.start)) {
 			current = playing
 			if err := hold(playing.end); err != nil {
 				return err
@@ -558,8 +648,8 @@ func play(ctx context.Context, m *mpv, dir, empty string, base Show, settle time
 		if late := time.Since(playing.start); !image && late > time.Second {
 			offset = late
 		}
-		current, showingEmpty = playing, false
-		if err := m.show(ctx, interrupt, moved, filepath.Join(dir, playing.name), image, offset, playing.end); err != nil {
+		current, currentDir, showingEmpty = playing, c.dir, false
+		if err := m.show(ctx, interrupt, moved, filepath.Join(c.dir, playing.name), image, offset, playing.end); err != nil {
 			return err
 		}
 	}

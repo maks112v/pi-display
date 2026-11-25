@@ -133,6 +133,59 @@ func TestMirrorTimesDeletionsByTick(t *testing.T) {
 
 func plentyFree(string) (uint64, error) { return 1 << 40, nil }
 
+func TestMirrorEventFolders(t *testing.T) {
+	dst := t.TempDir()
+	now := time.Date(2026, 12, 5, 12, 0, 0, 0, time.Local)
+	modTime := now.Add(-time.Hour)
+	src := fstest.MapFS{
+		"main.jpg":        {Data: []byte("main"), ModTime: modTime},
+		"gala.event.toml": {Data: []byte("folder = \"gala\"\ndates = [\"2026-12-05\"]\nhours = [\"17:00-23:00\"]\n"), ModTime: modTime},
+		"old.event.toml":  {Data: []byte("folder = \"old\"\ndates = [\"2026-11-01\"]\n"), ModTime: modTime},
+		"gala/01.jpg":     {Data: []byte("one"), ModTime: modTime},
+		"gala/notes.txt":  {Data: []byte("skip"), ModTime: modTime},
+		"old/01.jpg":      {Data: []byte("past"), ModTime: modTime},
+		"other/01.jpg":    {Data: []byte("unused"), ModTime: modTime},
+	}
+	writeFile(t, dst, "main.jpg", "main")
+	if err := os.MkdirAll(filepath.Join(dst, "stale"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	removing := map[string]time.Time{"stale/x.jpg": now}
+
+	// One sync brings in the event file and its folder; ended and unused
+	// folders are left out, and a folder no event uses is removed.
+	if err := mirrorAll(src, dst, plentyFree, removing, time.Time{}, now); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := dirNames(t, dst), []string{"gala", "gala.event.toml", "main.jpg", "old.event.toml"}; !slices.Equal(got, want) {
+		t.Fatalf("dst = %v, want %v", got, want)
+	}
+	if got, want := dirNames(t, filepath.Join(dst, "gala")), []string{"01.jpg"}; !slices.Equal(got, want) {
+		t.Errorf("gala = %v, want %v", got, want)
+	}
+	if _, ok := removing["stale/x.jpg"]; ok {
+		t.Error("removing still holds a file from a removed folder")
+	}
+
+	// A file deleted from the event folder waits its turn, keyed by its path.
+	delete(src, "gala/01.jpg")
+	src["gala/02.jpg"] = &fstest.MapFile{Data: []byte("two"), ModTime: modTime}
+	if err := mirrorAll(src, dst, plentyFree, removing, now, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := removing["gala/01.jpg"]; !ok {
+		t.Errorf("removing = %v, want gala/01.jpg", removing)
+	}
+
+	// Once the event is over its folder goes.
+	if err := mirrorAll(src, dst, plentyFree, removing, time.Time{}, now.Add(12*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dst, "gala")); !os.IsNotExist(err) {
+		t.Errorf("gala still there after the event: %v", err)
+	}
+}
+
 func TestParseSMB(t *testing.T) {
 	got, err := parseSMB("smb://nas.local/media/lobby/screen")
 	if err != nil {

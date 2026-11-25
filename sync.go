@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -196,14 +197,15 @@ func syncOnce(ctx context.Context, d Device, dir string, logs *shareLog, removin
 		return err
 	}
 	defer closeFn()
-	err = mirror(src, dir, diskFree, removing, tick, time.Now())
+	err = mirrorAll(src, dir, diskFree, removing, tick, time.Now())
 	if dst, ok := src.(appender); ok && logs != nil {
 		logs.flush(dst)
 	}
 	return err
 }
 
-// mirror makes dst match the media files, display.toml, and screen.txt at the
+// mirror makes dst match the media files, display.toml, screen.txt, and event
+// files at the
 // top level of src (an SMB share or a public Drive folder). Files are compared
 // by size and mtime, downloaded to a hidden temp file, then renamed into place
 // so the player never sees a partial file. free reports the bytes available in dst;
@@ -219,6 +221,54 @@ func syncOnce(ctx context.Context, d Device, dir string, logs *shareLog, removin
 // timelines stay the same. With neither time (a Drive folder's first sync at
 // startup) deleted files go right away.
 func mirror(src fs.FS, dst string, free func(dir string) (uint64, error), removing map[string]time.Time, tick, now time.Time) error {
+	return mirrorDir(src, dst, "", free, removing, tick, now)
+}
+
+// mirrorAll mirrors the top level, then the folder of every event that
+// hasn't ended (see event.go) into a subfolder of dst, and removes local
+// subfolders no live event uses. Events are read from the files just
+// mirrored, so a new event's folder starts downloading in the same sync that
+// brought in its event file, well before it starts.
+func mirrorAll(src fs.FS, dst string, free func(dir string) (uint64, error), removing map[string]time.Time, tick, now time.Time) error {
+	errs := []error{mirror(src, dst, free, removing, tick, now)}
+	es, _ := loadEvents(dst, defaultShow, time.Local)
+	live := es.liveFolders(now)
+	for _, folder := range live {
+		sub, err := fs.Sub(src, folder)
+		if err == nil {
+			err = os.MkdirAll(filepath.Join(dst, folder), 0o755)
+		}
+		if err == nil {
+			err = mirrorDir(sub, filepath.Join(dst, folder), folder+"/", free, removing, tick, now)
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("event folder %s: %w", folder, err))
+		}
+	}
+	locals, err := os.ReadDir(dst)
+	if err != nil {
+		return errors.Join(append(errs, err)...)
+	}
+	for _, e := range locals {
+		if !e.IsDir() || slices.Contains(live, e.Name()) {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dst, e.Name())); err != nil {
+			errs = append(errs, err)
+		}
+		for key := range removing {
+			if strings.HasPrefix(key, e.Name()+"/") {
+				delete(removing, key)
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// mirrorDir is mirror for one folder. prefix is the folder's path from the
+// top ("" or "gala/"), which keys its files in removing so syncLoop removes
+// them from the right place.
+func mirrorDir(src fs.FS, dst, prefix string, free func(dir string) (uint64, error), removing map[string]time.Time, tick, now time.Time) error {
 	entries, err := fs.ReadDir(src, ".")
 	if err != nil {
 		return err
@@ -259,27 +309,27 @@ func mirror(src fs.FS, dst string, free func(dir string) (uint64, error), removi
 			changed = now // the source's clock is ahead
 		}
 	}
-	for name := range removing {
-		if keep[name] {
-			delete(removing, name) // put back before it was due
-		}
+	for name := range keep {
+		delete(removing, prefix+name) // put back before it was due
 	}
 	for _, e := range locals {
 		name := e.Name()
-		if keep[name] {
+		// Subfolders are event folders, which mirrorAll looks after.
+		if keep[name] || e.IsDir() {
 			continue
 		}
+		key := prefix + name
 		if wanted(name) && !changed.IsZero() {
 			// The first sighting sets the time, so later changes to the
 			// folder don't push it back.
-			if _, ok := removing[name]; !ok {
-				removing[name] = changed.Add(settleTime)
+			if _, ok := removing[key]; !ok {
+				removing[key] = changed.Add(settleTime)
 			}
-			if now.Before(removing[name]) {
+			if now.Before(removing[key]) {
 				continue
 			}
 		}
-		delete(removing, name)
+		delete(removing, key)
 		if err := os.RemoveAll(filepath.Join(dst, name)); err != nil {
 			errs = append(errs, err)
 		}
@@ -315,8 +365,7 @@ func diskFree(dir string) (uint64, error) {
 
 // wanted rejects anything that could escape dst or isn't something we play.
 func wanted(name string) bool {
-	return fs.ValidPath(name) && !strings.ContainsAny(name, `/\`) && !strings.HasPrefix(name, ".") &&
-		(isMedia(name) || name == showFile || name == screenFile)
+	return safeName(name) && (isMedia(name) || name == showFile || name == screenFile || isEventFile(name))
 }
 
 func download(src fs.FS, name, dst string, modTime time.Time) error {

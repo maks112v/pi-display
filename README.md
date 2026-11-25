@@ -87,7 +87,7 @@ To build from source instead: `GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o
 
 - SMB and Drive folders are mirrored into `/var/lib/pi-display/media` every 30 seconds, on the minute and half minute. Playback runs from that copy, so the slideshow starts at boot before the network is up and keeps going if the source goes offline. Make sure the SD card has room for the whole folder. A file that would leave less than 256 MB free is skipped and logged instead of filling the card; the rest of the folder keeps syncing.
 - Drive is read through its public folder view and download links, not the API, so Google can break it by changing those pages. Native Google Docs are ignored. If two files share a name, the first one listed wins.
-- Only files at the top level of the folder are used. Subfolders and hidden files are ignored.
+- Only files at the top level of the folder are used. Hidden files are ignored, and so are subfolders, except the folder of an [event](#events).
 - Order is natural filename order: `2.jpg` plays before `10.jpg`. With `shuffle = true`, every file plays once per loop in a new random order each time (the same order on every screen), and the last file of one loop never plays first in the next.
 - The folder and `display.toml` are checked every second. A change that moves what should be on screen (a file added or removed, a new duration, shuffle turned on) cuts off whatever is playing and jumps straight to the new spot, so all screens switch together.
 - Screens on the same folder stay in step without talking to each other. Playback follows the Pi's network-synced clock: the folder loops back to back from a fixed point in time, each image taking its duration and each video its length, so every Pi works out the same file at the same moment. A Pi that boots or falls behind joins at the right spot, partway into a video if need be. A new SMB or Drive file waits until it is a minute old before playing, so every Pi has synced it and they all add it together. A deleted file likewise keeps playing until a minute after the deletion, then drops out on every screen at once. SMB times the deletion from when the share folder changed. Drive folders don't record that, so every Pi syncs on the same clock ticks (:00 and :30) and times it from the tick that noticed it. A Pi that can't reach the network at boot plays out of step until its clock is set.
@@ -142,9 +142,21 @@ pi-display off 2h    # off for any duration, TV in standby
 pi-display on 0      # cancel either and go back to the schedule
 ```
 
-`on` also wakes a TV someone turned off with the remote, and `off` works with or without a schedule. A new command replaces the last one, takes effect within a second, and survives a reboot. Schedule changes and expired overrides take effect at the next slide. Set the Pi's timezone with `sudo raspi-config` so the schedule matches the wall clock.
+`on` also wakes a TV someone turned off with the remote, and `off` works with or without a schedule. A new command replaces the last one, takes effect within a second, and survives a reboot. Schedule changes and expired overrides take effect within a second. Set the Pi's timezone with `sudo raspi-config` so the schedule matches the wall clock.
 
 To switch every screen on a folder at once, save a `screen.txt` at the top of the folder containing one command, like `off 30m` or `on 2h`. Each Pi applies it once within about 30 seconds, timed from when the file was saved, so all screens switch back together and a Pi that was offline gets only the time that's left. Save the file again to send another command.
+
+## Events
+
+To play a separate folder on certain dates and then never again, put the media in a subfolder like `gala/` and save a `gala.event.toml` next to it. The [event generator](https://pi-display.maks112v.com/event) builds one:
+
+```toml
+folder = "gala"
+dates  = ["2026-12-05"]
+hours  = ["17:00-23:30"]   # leave out for the whole day
+```
+
+During those hours every screen plays `gala/` from its first file, whatever the schedule says. For the rest of those dates the screen is off: the event replaces that day's schedule. Slideshow keys like `image_seconds` or `shuffle` can be added to apply to the event only. SMB and Drive Pis copy the subfolder as soon as the event file appears and drop it once the event is over, after which the file does nothing.
 
 ## Fixing a Pi on site
 
